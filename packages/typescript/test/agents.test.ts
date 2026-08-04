@@ -2,8 +2,7 @@ import assert from "node:assert/strict";
 import { generateKeyPairSync } from "node:crypto";
 import test from "node:test";
 import { CoinbaseAdvancedTradeClient, RobinhoodCryptoClient } from "../src/brokers/index.js";
-import { readBrokerAgentConfig } from "../examples/agents/config.js";
-import { readAgentResearchConfig } from "../examples/agents/research.js";
+import { readAgentResearchConfig, readBrokerAgentConfig } from "../examples/agents/config.js";
 
 test("agent settings enforce bounded notional and broker-specific live confirmations", () => {
   assert.deepEqual(readBrokerAgentConfig("coinbase", {}), {
