@@ -1,23 +1,31 @@
+import { x402Client } from "@x402/core/client";
 import { createEvmPaymentClient, OmniX402Client } from "@omni-terminal/sdk";
 
-if (!process.env.EVM_PRIVATE_KEY) throw new Error("EVM_PRIVATE_KEY is required for x402 payments");
+const runPaidExamples = process.env.RUN_PAID_EXAMPLES === "true";
+const privateKey = process.env.EVM_PRIVATE_KEY as `0x${string}` | undefined;
+
+if (runPaidExamples && !privateKey) {
+  throw new Error("EVM_PRIVATE_KEY is required when RUN_PAID_EXAMPLES=true");
+}
 
 const client = new OmniX402Client({
   baseUrl: process.env.OMNI_APP_URL,
-  paymentClient: createEvmPaymentClient(process.env.EVM_PRIVATE_KEY as `0x${string}`, {
-    maxPaymentUsd: Number(process.env.X402_MAX_PAYMENT_USD ?? "0.01"),
-  }),
+  paymentClient: runPaidExamples
+    ? createEvmPaymentClient(privateKey!, {
+        maxPaymentUsd: Number(process.env.X402_MAX_PAYMENT_USD ?? "0.01"),
+      })
+    : new x402Client(),
 });
 
 console.log("news health", await client.newsHealth());
 console.log("trader profile health", await client.traderProfileHealth());
 
-if (process.env.RUN_PAID_EXAMPLES !== "true") {
+if (!runPaidExamples) {
   console.log("Set RUN_PAID_EXAMPLES=true to purchase each route once. No paid call was made.");
   process.exit(0);
 }
 
-const address = process.env.HL_ADDRESS ?? "0x0ddf9bae2af4b874b96d287a5ad42eb47138a902";
+const address = process.env.HL_ADDRESS || "0x0ddf9bae2af4b874b96d287a5ad42eb47138a902";
 const calls = [
   ["symbol news", () => client.symbolNews("BTC", { limit: 3, event_window_minutes: 60 })],
   ["market news", () => client.marketNews("equities", { limit: 3 })],

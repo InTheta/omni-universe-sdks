@@ -1,6 +1,6 @@
 # Omni Terminal TypeScript SDK
 
-Public Node.js/TypeScript clients for Omni's AI News, enriched analytics, MCP, and x402 products; direct Hyperliquid public REST/WebSocket data; and live-capable Coinbase Advanced Trade and Robinhood Crypto agent examples.
+Public TypeScript clients for Node.js 20.19+ covering Omni's AI News, enriched analytics, MCP, and x402 products; direct Hyperliquid public REST/WebSocket data; and live-capable Coinbase Advanced Trade and Robinhood Crypto agent examples.
 
 The SDK follows the published contracts:
 
@@ -19,10 +19,10 @@ Private deployment addresses are deliberately not embedded. Override the public 
 
 ## Install
 
-The public source release is available in this repository. npm registry publication is a separate release step and is not complete yet. Until then, develop from `packages/typescript` or install a verified release tarball.
+The public source release is available in this repository. npm registry publication is a separate release step and is not complete yet. Until then, install the verified GitHub release tarball or develop from `packages/typescript`.
 
 ```bash
-npm install @omni-terminal/sdk
+npm install https://github.com/InTheta/omni-universe-sdks/releases/download/v0.8.0/omni-terminal-sdk-0.8.0.tgz
 ```
 
 For source development:
@@ -33,11 +33,15 @@ cp .env.example .env
 npm run verify:live
 ```
 
-Node.js 20 or newer is required. The examples can be run with Node's env-file support:
+Every `npm run example:*` command loads `.env` when that file exists. Values already present in the process environment take precedence, so deployment and CI secrets do not need an on-disk file.
+
+Node.js 20.19 or newer is required. The examples can also be run directly with Node's env-file support:
 
 ```bash
 node --env-file=.env --import tsx examples/rest-api-key.ts
 ```
+
+For a complete research-to-order walkthrough, including Coinbase and Robinhood credentials, dry-run behavior, exact live gates and custom-agent patterns, read [Building Coinbase and Robinhood agents with Omni data](docs/trading-agents.md).
 
 ## Authentication and payment
 
@@ -169,25 +173,32 @@ npm run example:robinhood
 Both agents:
 
 - purchase `market-risk` through x402 REST by default, or through Omni MCP when `OMNI_RESEARCH_TRANSPORT=mcp`;
+- require `RUN_PAID_RESEARCH=true` before that single purchase and hard-cap it at `$0.01`;
 - apply a deterministic confidence and funding guardrail;
-- cap order notional with `MAX_ORDER_NOTIONAL_USD`;
+- cap order notional with `MAX_ORDER_NOTIONAL_USD` and refuse an example ceiling above `$100`;
 - return `HOLD` when the signal is weak or funding is extreme;
-- require `LIVE_TRADING=true` before submitting an order.
+- require `LIVE_TRADING=true` plus `CONFIRM_LIVE_ORDER=COINBASE_LIVE_ORDER` or `ROBINHOOD_LIVE_ORDER` before submitting an order.
 
-Coinbase always calls the authenticated order-preview endpoint first, including in dry-run mode. Live submissions fail closed unless the preview contains an `errs` array with no failures and a `preview_id`, which is forwarded to order creation. Robinhood has no preview endpoint in its public Crypto Trading API, so dry-run mode returns the exact signed-order payload without transmitting it. Robinhood execution uses the documented v2 order route and Ed25519 request signing. The signature implementation is tested against Robinhood's published test vector.
+Coinbase always calls the authenticated order-preview endpoint first, including in dry-run mode. Live submissions fail closed unless the preview contains an `errs` array with no failures and a `preview_id`, which is forwarded to order creation. Robinhood has no preview endpoint in its public Crypto Trading API, so dry-run mode returns the exact v2 order path and body without transmitting or signing it. Robinhood live execution signs the exact transmitted body and uses the documented v2 order route. The signature implementation is tested against Robinhood's published Ed25519 test vector.
 
 These are integration examples, not a profitable strategy or investment advice. Use separate least-privilege keys, wallet spending limits, broker-side limits, and human approval for material orders.
+
+See the [full trading-agent guide](docs/trading-agents.md) for copy-paste environment templates, Coinbase ECDSA key setup and static sandbox notes, Robinhood Ed25519 setup, transport selection, side-effect matrix, extension examples and deployment checklist.
 
 ## Verification
 
 ```bash
 npm run typecheck
+npm run test:agents
+npm run test:docs
 npm test
 npm run test:live
 npm audit --omit=dev
 ```
 
 `test:live` spends nothing. It verifies Omni health, direct Hyperliquid instruments/candles/WebSocket data, the published REST/x402 route boundary, every MCP tool, and valid unpaid challenges from all nine x402 routes.
+
+`npm run verify` additionally creates the real npm tarball, checks its allowlisted contents, installs it into a clean temporary consumer project, and imports the public root and broker subpath exports. This is stronger than a packaging dry run and detects version/export drift from the artifact consumers actually receive.
 
 ## Public references
 

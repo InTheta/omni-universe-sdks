@@ -5,21 +5,20 @@ import {
   type MarketRisk,
   type X402Symbol,
 } from "@omni-terminal/sdk";
+import { readAgentResearchConfig } from "./config.js";
 
 export async function loadMarketRisk(symbol: X402Symbol): Promise<{
   data: MarketRisk;
   payment: unknown;
   transport: "x402-rest" | "x402-mcp";
 }> {
-  const privateKey = process.env.EVM_PRIVATE_KEY as `0x${string}`;
-  const maxPaymentUsd = Number(process.env.X402_MAX_PAYMENT_USD ?? "0.01");
-  const transport = process.env.OMNI_RESEARCH_TRANSPORT ?? "x402";
+  const config = readAgentResearchConfig();
 
-  if (transport === "mcp") {
+  if (config.transport === "mcp") {
     const mcp = await new OmniMcpClient({
       url: process.env.OMNI_MCP_URL,
-      privateKey,
-      maxPaymentUsd,
+      privateKey: config.privateKey,
+      maxPaymentUsd: config.maxPaymentUsd,
       approvePayment: () => true,
     }).connect();
     try {
@@ -30,10 +29,9 @@ export async function loadMarketRisk(symbol: X402Symbol): Promise<{
     }
   }
 
-  if (transport !== "x402") throw new Error("OMNI_RESEARCH_TRANSPORT must be x402 or mcp");
   const client = new OmniX402Client({
     baseUrl: process.env.OMNI_APP_URL,
-    paymentClient: createEvmPaymentClient(privateKey, { maxPaymentUsd }),
+    paymentClient: createEvmPaymentClient(config.privateKey, { maxPaymentUsd: config.maxPaymentUsd }),
   });
   const result = await client.marketRisk(symbol, { scope: "current", limit: 5 });
   return { data: result.data, payment: result.payment, transport: "x402-rest" };

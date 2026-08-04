@@ -10,5 +10,5 @@
       "@omni-terminal/sdk/brokers": ["./src/brokers/index.ts"]
     }
   },
-  "include": ["src/**/*.ts", "examples/**/*.ts", "test/**/*.ts"]
+  "include": ["src/**/*.ts", "examples/**/*.ts", "scripts/**/*.ts", "test/**/*.ts"]
 }

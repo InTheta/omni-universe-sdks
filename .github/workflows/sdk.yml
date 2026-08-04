@@ -4,12 +4,20 @@ on:
   push:
     paths:
       - "packages/typescript/**"
+      - "examples/testnet-agents/**"
       - ".github/workflows/sdk.yml"
   pull_request:
     paths:
       - "packages/typescript/**"
+      - "examples/testnet-agents/**"
       - ".github/workflows/sdk.yml"
   workflow_dispatch:
+    inputs:
+      run_testnet_order_lifecycle:
+        description: "Use configured secrets for the capped Hyperliquid testnet place/cancel lifecycle"
+        required: false
+        default: false
+        type: boolean
   schedule:
     - cron: "17 6 * * *"
 
@@ -40,7 +48,6 @@ jobs:
           cache-dependency-path: packages/typescript/package-lock.json
       - run: npm ci
       - run: npm run verify
-      - run: npm run pack:check
 
   live-contract:
     name: Live no-spend contracts
@@ -59,3 +66,42 @@ jobs:
           cache-dependency-path: packages/typescript/package-lock.json
       - run: npm ci
       - run: npm run test:live
+
+  testnet-agents:
+    name: Hyperliquid testnet agents (Node 22)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: examples/testnet-agents
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: examples/testnet-agents/package-lock.json
+      - run: npm ci
+      - run: npm run verify:live
+
+  testnet-order-lifecycle:
+    name: Hyperliquid funded testnet lifecycle
+    if: github.event_name == 'workflow_dispatch'
+    needs: testnet-agents
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: examples/testnet-agents
+    env:
+      HL_TESTNET_PRIVATE_KEY: ${{ secrets.HL_TESTNET_PRIVATE_KEY }}
+      HL_TESTNET_ACCOUNT_ADDRESS: ${{ secrets.HL_TESTNET_ACCOUNT_ADDRESS }}
+      RUN_TESTNET_ORDERS: ${{ github.event_name == 'workflow_dispatch' && inputs.run_testnet_order_lifecycle && secrets.HL_TESTNET_PRIVATE_KEY != '' && 'true' || 'false' }}
+      CONFIRM_TESTNET_ORDER: ${{ github.event_name == 'workflow_dispatch' && inputs.run_testnet_order_lifecycle && secrets.HL_TESTNET_PRIVATE_KEY != '' && 'HYPERLIQUID_TESTNET_ONLY' || '' }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: examples/testnet-agents/package-lock.json
+      - run: npm ci
+      - run: npm run test:order
