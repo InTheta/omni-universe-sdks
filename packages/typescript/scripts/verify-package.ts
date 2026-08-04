@@ -37,6 +37,7 @@ try {
     "dist/brokers/index.d.ts",
     "examples/rest-api-key.ts",
     "examples/x402-all-routes.ts",
+    "docs/examples.md",
     "docs/trading-agents.md",
     "README.md",
     "LICENSE",

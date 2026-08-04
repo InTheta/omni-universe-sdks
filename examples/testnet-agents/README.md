@@ -29,10 +29,11 @@ Run individual agents:
 ```bash
 npm run example:momentum
 npm run example:mean-reversion
+npm run example:omni-risk:demo
 npm run example:omni-risk
 ```
 
-The Omni risk example requires `RUN_PAID_RESEARCH=true`, a separately funded `EVM_PRIVATE_KEY`, and either `OMNI_RESEARCH_TRANSPORT=x402` or `mcp`. Its x402 ceiling is hard-limited to `$0.01` per research call. The EVM buyer-wallet key is never sent to Hyperliquid, and the Hyperliquid testnet key is never sent to Omni.
+`example:omni-risk:demo` uses deterministic research, makes no payment, and reads the live Hyperliquid testnet market only to produce a dry-run order plan. It refuses `RUN_TESTNET_ORDERS=true`. The configured Omni risk example requires `RUN_PAID_RESEARCH=true`, a separately funded `EVM_PRIVATE_KEY`, and either `OMNI_RESEARCH_TRANSPORT=x402` or `mcp`. Its x402 ceiling is hard-limited to `$0.01` per research call. The EVM buyer-wallet key is never sent to Hyperliquid, and the Hyperliquid testnet key is never sent to Omni.
 
 ## Funded testnet lifecycle
 

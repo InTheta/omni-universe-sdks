@@ -35,6 +35,8 @@ npm run verify:live
 
 Every `npm run example:*` command loads `.env` when that file exists. Values already present in the process environment take precedence, so deployment and CI secrets do not need an on-disk file.
 
+Start with the [runnable example runbook](docs/examples.md). It lists every command, prerequisite, side effect and termination condition, and includes offline demos for authenticated news, Coinbase and Robinhood.
+
 Node.js 20.19 or newer is required. The examples can also be run directly with Node's env-file support:
 
 ```bash
@@ -166,6 +168,8 @@ Paid MCP calls are denied by default. Supply an `approvePayment` callback so the
 The Coinbase and Robinhood examples use Omni only for read-only research. Broker credentials remain with their broker client, and Omni receives no order authority.
 
 ```bash
+npm run example:coinbase:demo
+npm run example:robinhood:demo
 npm run example:coinbase
 npm run example:robinhood
 ```
@@ -183,20 +187,21 @@ Coinbase always calls the authenticated order-preview endpoint first, including 
 
 These are integration examples, not a profitable strategy or investment advice. Use separate least-privilege keys, wallet spending limits, broker-side limits, and human approval for material orders.
 
-See the [full trading-agent guide](docs/trading-agents.md) for copy-paste environment templates, Coinbase ECDSA key setup and static sandbox notes, Robinhood Ed25519 setup, transport selection, side-effect matrix, extension examples and deployment checklist.
+Use the `:demo` commands first: they require no credentials or payment and cannot submit an order. See the [full trading-agent guide](docs/trading-agents.md) for copy-paste environment templates, Coinbase ECDSA key setup and static sandbox notes, Robinhood Ed25519 setup, transport selection, side-effect matrix, extension examples and deployment checklist.
 
 ## Verification
 
 ```bash
 npm run typecheck
 npm run test:agents
+npm run test:examples
 npm run test:docs
 npm test
 npm run test:live
 npm audit --omit=dev
 ```
 
-`test:live` spends nothing. It verifies Omni health, direct Hyperliquid instruments/candles/WebSocket data, the published REST/x402 route boundary, every MCP tool, and valid unpaid challenges from all nine x402 routes.
+`npm run verify:live` uses the forced `example:rest:public`, `example:x402:free`, and `example:mcp:free` variants. They ignore keyed/payment flags from `.env`, spend nothing, and submit no order. The live tests verify Omni health, direct Hyperliquid instruments/candles/WebSocket data, the published REST/x402 route boundary, every MCP tool, and valid unpaid challenges from all nine x402 routes.
 
 `npm run verify` additionally creates the real npm tarball, checks its allowlisted contents, installs it into a clean temporary consumer project, and imports the public root and broker subpath exports. This is stronger than a packaging dry run and detects version/export drift from the artifact consumers actually receive.
 

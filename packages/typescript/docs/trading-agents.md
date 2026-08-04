@@ -43,6 +43,8 @@ npm run verify
 
 All `npm run example:*` commands load `.env` when present. Existing process environment values take precedence over the file.
 
+For a command-by-command setup and side-effect matrix, including credential-free demos, read the [runnable example runbook](examples.md).
+
 Applications can install the verified release artifact instead:
 
 ```bash
@@ -114,6 +116,9 @@ Official references:
 Run the agent:
 
 ```bash
+npm run example:coinbase:demo
+
+# Configured paid-research and authenticated-preview path:
 node --env-file=.env --import tsx examples/agents/coinbase-agent.ts
 # or
 npm run example:coinbase
@@ -147,6 +152,9 @@ See the [official Robinhood Crypto Trading API documentation](https://docs.robin
 Run the agent:
 
 ```bash
+npm run example:robinhood:demo
+
+# Configured paid-research path:
 node --env-file=.env --import tsx examples/agents/robinhood-agent.ts
 # or
 npm run example:robinhood
@@ -168,6 +176,7 @@ The live client signs the exact transmitted JSON body with Ed25519 and sends `x-
 | Command and flags | Pays Omni | Calls broker | Can create an order |
 | --- | ---: | ---: | ---: |
 | `npm test` | No | Mocked only | No |
+| `npm run test:examples` | No | Mocked/local only | No |
 | `npm run test:live` | No | No | No |
 | `npm run example:x402` | No by default | No | No |
 | Broker agent with `RUN_PAID_RESEARCH=true`, `LIVE_TRADING=false` | One research call | Coinbase preview only; Robinhood none | No |

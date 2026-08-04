@@ -1,6 +1,6 @@
 {
   "name": "@omni-terminal/sdk",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "Public TypeScript SDK for Omni AI News, x402/MCP analytics, and direct Hyperliquid market data",
   "type": "module",
   "main": "./dist/index.js",
@@ -27,20 +27,27 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.examples.json --noEmit",
     "test": "node --import tsx --test test/unit.test.ts test/boundary.test.ts test/agents.test.ts",
     "test:agents": "node --import tsx --test test/agents.test.ts",
+    "test:examples": "npm run example:news-ws:demo && npm run example:coinbase:demo && npm run example:robinhood:demo",
     "test:live": "node --import tsx --test test/live.test.ts",
     "test:boundary": "tsx scripts/verify-public-boundary.ts .",
     "test:docs": "tsx scripts/verify-docs.ts ../..",
     "test:package": "tsx scripts/verify-package.ts",
     "pack:check": "npm pack --dry-run --json",
-    "verify": "npm run typecheck && npm test && npm run build && npm run test:boundary && npm run test:docs && npm run test:package && npm audit --omit=dev",
-    "verify:live": "npm run verify && npm run example:rest && npm run example:x402 && npm run test:live && npm run pack:check",
+    "verify": "npm run typecheck && npm test && npm run build && npm run test:examples && npm run test:boundary && npm run test:docs && npm run test:package && npm audit --omit=dev",
+    "verify:live": "npm run verify && npm run example:rest:public && npm run example:ws && npm run example:x402:free && npm run example:mcp:free && npm run test:live && npm run pack:check",
     "example:rest": "node --env-file-if-exists=.env --import tsx examples/rest-api-key.ts",
+    "example:rest:public": "node --env-file-if-exists=.env --import tsx examples/rest-api-key.ts --public-only",
     "example:ws": "node --env-file-if-exists=.env --import tsx examples/ws-market.ts",
     "example:news-ws": "node --env-file-if-exists=.env --import tsx examples/ws-news.ts",
+    "example:news-ws:demo": "node --env-file-if-exists=.env --import tsx examples/ws-news.ts --demo",
     "example:x402": "node --env-file-if-exists=.env --import tsx examples/x402-all-routes.ts",
+    "example:x402:free": "node --env-file-if-exists=.env --import tsx examples/x402-all-routes.ts --free-only",
     "example:mcp": "node --env-file-if-exists=.env --import tsx examples/mcp-all-tools.ts",
+    "example:mcp:free": "node --env-file-if-exists=.env --import tsx examples/mcp-all-tools.ts --free-only",
     "example:coinbase": "node --env-file-if-exists=.env --import tsx examples/agents/coinbase-agent.ts",
-    "example:robinhood": "node --env-file-if-exists=.env --import tsx examples/agents/robinhood-agent.ts"
+    "example:coinbase:demo": "node --env-file-if-exists=.env --import tsx examples/agents/coinbase-agent.ts --demo",
+    "example:robinhood": "node --env-file-if-exists=.env --import tsx examples/agents/robinhood-agent.ts",
+    "example:robinhood:demo": "node --env-file-if-exists=.env --import tsx examples/agents/robinhood-agent.ts --demo"
   },
   "engines": {
     "node": ">=20.19"

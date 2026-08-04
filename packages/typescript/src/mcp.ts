@@ -13,7 +13,7 @@ export type OmniMcpToolName =
   | "resolve_market_entities"
   | "get_market_carry";
 
-export const SDK_VERSION = "0.8.0";
+export const SDK_VERSION = "0.8.1";
 
 export interface OmniMcpMarketCatalog {
   service: "omni-market-intelligence";
