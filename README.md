@@ -12,6 +12,12 @@ Public SDKs, connection examples, market-data integrations, and guarded trading-
 
 The TypeScript package is source-available here and produces `@omni-terminal/sdk`. Publishing to the npm registry is a separate release step and has not been performed yet.
 
+Install the verified `v0.8.0` release tarball directly from GitHub until npm publication is complete:
+
+```bash
+npm install https://github.com/InTheta/omni-universe-sdks/releases/download/v0.8.0/omni-terminal-sdk-0.8.0.tgz
+```
+
 ## Connection model
 
 | Connection | Access | Intended use |
@@ -47,6 +53,8 @@ npm run test:live
 ```
 
 `test:live` spends nothing and submits no broker order. Paid examples require an explicit wallet key and opt-in flag. Broker examples default to dry-run behavior unless `LIVE_TRADING=true` is set.
+
+`npm run verify` also packs the SDK, installs that tarball into a clean temporary consumer project, and imports both the root SDK and broker entrypoint. This catches missing build output, export drift, accidental source/test publication, and package-version mismatches before release.
 
 See the [TypeScript SDK guide](packages/typescript/README.md), [contribution guide](CONTRIBUTING.md), and [security policy](SECURITY.md).
 

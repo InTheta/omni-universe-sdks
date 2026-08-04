@@ -19,10 +19,10 @@ Private deployment addresses are deliberately not embedded. Override the public 
 
 ## Install
 
-The public source release is available in this repository. npm registry publication is a separate release step and is not complete yet. Until then, develop from `packages/typescript` or install a verified release tarball.
+The public source release is available in this repository. npm registry publication is a separate release step and is not complete yet. Until then, install the verified GitHub release tarball or develop from `packages/typescript`.
 
 ```bash
-npm install @omni-terminal/sdk
+npm install https://github.com/InTheta/omni-universe-sdks/releases/download/v0.8.0/omni-terminal-sdk-0.8.0.tgz
 ```
 
 For source development:
@@ -188,6 +188,8 @@ npm audit --omit=dev
 ```
 
 `test:live` spends nothing. It verifies Omni health, direct Hyperliquid instruments/candles/WebSocket data, the published REST/x402 route boundary, every MCP tool, and valid unpaid challenges from all nine x402 routes.
+
+`npm run verify` additionally creates the real npm tarball, checks its allowlisted contents, installs it into a clean temporary consumer project, and imports the public root and broker subpath exports. This is stronger than a packaging dry run and detects version/export drift from the artifact consumers actually receive.
 
 ## Public references
 

@@ -40,7 +40,6 @@ jobs:
           cache-dependency-path: packages/typescript/package-lock.json
       - run: npm ci
       - run: npm run verify
-      - run: npm run pack:check
 
   live-contract:
     name: Live no-spend contracts
