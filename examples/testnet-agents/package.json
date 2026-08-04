@@ -1,0 +1,32 @@
+{
+  "name": "@omni-universe/testnet-agents",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Guarded Omni research and Hyperliquid testnet trading-agent examples",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test test/unit.test.ts",
+    "test:live": "node --import tsx --test test/live.test.ts",
+    "test:signed": "node --import tsx --test test/signed-contract.test.ts",
+    "test:order": "node --env-file-if-exists=.env --import tsx --test test/order-lifecycle.test.ts",
+    "verify": "npm run typecheck && npm test && npm audit --omit=dev",
+    "verify:live": "npm run verify && npm run test:live && npm run example:momentum && npm run example:mean-reversion",
+    "example:momentum": "node --env-file-if-exists=.env --import tsx agents/momentum-agent.ts",
+    "example:mean-reversion": "node --env-file-if-exists=.env --import tsx agents/mean-reversion-agent.ts",
+    "example:omni-risk": "node --env-file-if-exists=.env --import tsx agents/omni-risk-agent.ts"
+  },
+  "dependencies": {
+    "@nktkas/hyperliquid": "0.33.3",
+    "@omni-terminal/sdk": "https://github.com/InTheta/omni-universe-sdks/releases/download/v0.8.0/omni-terminal-sdk-0.8.0.tgz",
+    "viem": "2.55.10"
+  },
+  "devDependencies": {
+    "@types/node": "24.3.0",
+    "tsx": "4.23.5",
+    "typescript": "7.0.2"
+  }
+}

@@ -42,6 +42,11 @@ The TypeScript SDK includes runnable examples for:
 - [Coinbase research/trading agent](packages/typescript/examples/agents/coinbase-agent.ts)
 - [Robinhood research/trading agent](packages/typescript/examples/agents/robinhood-agent.ts)
 - [selectable x402 REST or MCP research connection](packages/typescript/examples/agents/research.ts)
+- [Hyperliquid testnet momentum agent](examples/testnet-agents/agents/momentum-agent.ts)
+- [Hyperliquid testnet mean-reversion agent](examples/testnet-agents/agents/mean-reversion-agent.ts)
+- [Omni x402/MCP risk agent with Hyperliquid testnet execution](examples/testnet-agents/agents/omni-risk-agent.ts)
+
+The [testnet-agent package](examples/testnet-agents) runs on Node.js 22.12+ and is pinned to Hyperliquid testnet. It defaults to dry-run previews, hard-caps testnet orders at `$25`, and includes read-only live tests, a signed unfunded contract probe, and an opt-in funded `place -> verify -> cancel` lifecycle.
 
 ## Develop
 
