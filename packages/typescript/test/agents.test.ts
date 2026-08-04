@@ -1,8 +1,27 @@
 import assert from "node:assert/strict";
 import { generateKeyPairSync } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { CoinbaseAdvancedTradeClient, RobinhoodCryptoClient } from "../src/brokers/index.js";
 import { readAgentResearchConfig, readBrokerAgentConfig } from "../examples/agents/config.js";
+
+test("public example commands load an optional .env file on the supported Node floor", async () => {
+  const packageJson = JSON.parse(
+    await readFile(new URL("../package.json", import.meta.url), "utf8"),
+  ) as { engines: { node: string }; scripts: Record<string, string> };
+
+  assert.equal(packageJson.engines.node, ">=20.19");
+  const exampleCommands = Object.entries(packageJson.scripts)
+    .filter(([name]) => name.startsWith("example:"));
+  assert.ok(exampleCommands.length > 0);
+  for (const [name, command] of exampleCommands) {
+    assert.match(
+      command,
+      /^node --env-file-if-exists=\.env --import tsx /,
+      `${name} must load .env without requiring it`,
+    );
+  }
+});
 
 test("agent settings enforce bounded notional and broker-specific live confirmations", () => {
   assert.deepEqual(readBrokerAgentConfig("coinbase", {}), {

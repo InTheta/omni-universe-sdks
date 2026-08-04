@@ -31,7 +31,7 @@ Public Hyperliquid data goes directly to Hyperliquid. Omni does not receive Coin
 
 ## 1. Install
 
-Node.js 20 or newer is required for the main SDK.
+Node.js 20.19 or newer is required. The example commands use Node's optional environment-file loader so the same npm scripts work with a local `.env` file or injected deployment secrets.
 
 ```bash
 git clone https://github.com/InTheta/omni-universe-sdks.git
@@ -40,6 +40,8 @@ npm ci
 cp .env.example .env
 npm run verify
 ```
+
+All `npm run example:*` commands load `.env` when present. Existing process environment values take precedence over the file.
 
 Applications can install the verified release artifact instead:
 

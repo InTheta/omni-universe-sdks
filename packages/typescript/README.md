@@ -1,6 +1,6 @@
 # Omni Terminal TypeScript SDK
 
-Public Node.js/TypeScript clients for Omni's AI News, enriched analytics, MCP, and x402 products; direct Hyperliquid public REST/WebSocket data; and live-capable Coinbase Advanced Trade and Robinhood Crypto agent examples.
+Public TypeScript clients for Node.js 20.19+ covering Omni's AI News, enriched analytics, MCP, and x402 products; direct Hyperliquid public REST/WebSocket data; and live-capable Coinbase Advanced Trade and Robinhood Crypto agent examples.
 
 The SDK follows the published contracts:
 
@@ -33,7 +33,9 @@ cp .env.example .env
 npm run verify:live
 ```
 
-Node.js 20 or newer is required. The examples can be run with Node's env-file support:
+Every `npm run example:*` command loads `.env` when that file exists. Values already present in the process environment take precedence, so deployment and CI secrets do not need an on-disk file.
+
+Node.js 20.19 or newer is required. The examples can also be run directly with Node's env-file support:
 
 ```bash
 node --env-file=.env --import tsx examples/rest-api-key.ts
