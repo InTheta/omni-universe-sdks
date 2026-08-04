@@ -78,7 +78,15 @@ try {
 }
 
 function run(command: string, args: string[], cwd: string): string {
-  const result = spawnSync(command, args, { cwd, encoding: "utf8", env: process.env });
+  const result = spawnSync(command, args, {
+    cwd,
+    encoding: "utf8",
+    env: process.env,
+    // Windows batch launchers such as npm.cmd require a command shell when
+    // invoked through spawnSync. Without it, Node 22 returns EINVAL before npm
+    // can create or install the package tarball.
+    shell: process.platform === "win32" && command.toLowerCase().endsWith(".cmd"),
+  });
   if (result.error) throw result.error;
   if (result.status !== 0) {
     throw new Error([
