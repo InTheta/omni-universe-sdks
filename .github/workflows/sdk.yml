@@ -1,0 +1,61 @@
+name: SDK CI
+
+on:
+  push:
+    paths:
+      - "packages/typescript/**"
+      - ".github/workflows/sdk.yml"
+  pull_request:
+    paths:
+      - "packages/typescript/**"
+      - ".github/workflows/sdk.yml"
+  workflow_dispatch:
+  schedule:
+    - cron: "17 6 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sdk-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify TypeScript (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22]
+    defaults:
+      run:
+        working-directory: packages/typescript
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+          cache-dependency-path: packages/typescript/package-lock.json
+      - run: npm ci
+      - run: npm run verify
+      - run: npm run pack:check
+
+  live-contract:
+    name: Live no-spend contracts
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    needs: verify
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/typescript
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: packages/typescript/package-lock.json
+      - run: npm ci
+      - run: npm run test:live

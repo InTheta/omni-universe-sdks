@@ -1,0 +1,71 @@
+{
+  "name": "@omni-terminal/sdk",
+  "version": "0.8.0",
+  "description": "Public TypeScript SDK for Omni AI News, x402/MCP analytics, and direct Hyperliquid market data",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./brokers": {
+      "types": "./dist/brokers/index.d.ts",
+      "import": "./dist/brokers/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "examples",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.examples.json --noEmit",
+    "test": "node --import tsx --test test/unit.test.ts test/boundary.test.ts",
+    "test:live": "node --import tsx --test test/live.test.ts",
+    "test:boundary": "tsx scripts/verify-public-boundary.ts .",
+    "pack:check": "npm pack --dry-run --json",
+    "verify": "npm run typecheck && npm test && npm run build && npm run test:boundary && npm audit --omit=dev",
+    "verify:live": "npm run verify && npm run example:rest && npm run test:live && npm run pack:check",
+    "example:rest": "tsx examples/rest-api-key.ts",
+    "example:ws": "tsx examples/ws-market.ts",
+    "example:news-ws": "tsx examples/ws-news.ts",
+    "example:x402": "tsx examples/x402-all-routes.ts",
+    "example:mcp": "tsx examples/mcp-all-tools.ts",
+    "example:coinbase": "tsx examples/agents/coinbase-agent.ts",
+    "example:robinhood": "tsx examples/agents/robinhood-agent.ts"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@coinbase/cdp-sdk": "1.46.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@x402/core": "^2.20.0",
+    "@x402/evm": "^2.20.0",
+    "@x402/fetch": "^2.20.0",
+    "@x402/mcp": "^2.20.0",
+    "tweetnacl": "^1.0.3",
+    "viem": "^2.37.13",
+    "ws": "^8.21.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.23.5",
+    "typescript": "^7.0.2"
+  },
+  "keywords": [
+    "omni-terminal",
+    "hyperliquid",
+    "x402",
+    "mcp",
+    "trading",
+    "market-data"
+  ],
+  "license": "MIT",
+  "sideEffects": false
+}
