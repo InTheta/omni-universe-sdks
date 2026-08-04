@@ -6,12 +6,16 @@ import {
   type X402Symbol,
 } from "@omni-terminal/sdk";
 import { readAgentResearchConfig } from "./config.js";
+import { demoMarketRisk } from "./demo.js";
 
-export async function loadMarketRisk(symbol: X402Symbol): Promise<{
+export async function loadMarketRisk(symbol: X402Symbol, options: { demo?: boolean } = {}): Promise<{
   data: MarketRisk;
   payment: unknown;
-  transport: "x402-rest" | "x402-mcp";
+  transport: "demo-fixture" | "x402-rest" | "x402-mcp";
 }> {
+  if (options.demo) {
+    return { data: demoMarketRisk(symbol), payment: null, transport: "demo-fixture" };
+  }
   const config = readAgentResearchConfig();
 
   if (config.transport === "mcp") {

@@ -21,6 +21,14 @@ test("public example commands load an optional .env file on the supported Node f
       `${name} must load .env without requiring it`,
     );
   }
+  assert.match(packageJson.scripts["test:examples"] ?? "", /example:news-ws:demo/);
+  assert.match(packageJson.scripts["test:examples"] ?? "", /example:coinbase:demo/);
+  assert.match(packageJson.scripts["test:examples"] ?? "", /example:robinhood:demo/);
+  assert.match(packageJson.scripts["verify:live"] ?? "", /example:rest:public/);
+  assert.match(packageJson.scripts["verify:live"] ?? "", /example:x402:free/);
+  assert.match(packageJson.scripts["verify:live"] ?? "", /example:mcp:free/);
+  assert.doesNotMatch(packageJson.scripts["verify:live"] ?? "", /npm run example:x402(?:\s|$)/);
+  assert.doesNotMatch(packageJson.scripts["verify:live"] ?? "", /npm run example:mcp(?:\s|$)/);
 });
 
 test("agent settings enforce bounded notional and broker-specific live confirmations", () => {

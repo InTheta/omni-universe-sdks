@@ -8,11 +8,11 @@ Public SDKs, connection examples, market-data integrations, and guarded trading-
 
 | SDK | Status | Runtime | Coverage |
 | --- | --- | --- | --- |
-| [TypeScript](packages/typescript) | Source release `0.8.0` | Node.js 20.19+ | Omni API-key REST/WS, x402 REST, x402 MCP, direct Hyperliquid REST/WS, Coinbase and Robinhood agent examples |
+| [TypeScript](packages/typescript) | Source `0.8.1` (unreleased) | Node.js 20.19+ | Omni API-key REST/WS, x402 REST, x402 MCP, direct Hyperliquid REST/WS, Coinbase and Robinhood agent examples |
 
 The TypeScript package is source-available here and produces `@omni-terminal/sdk`. Publishing to the npm registry is a separate release step and has not been performed yet.
 
-Install the verified `v0.8.0` release tarball directly from GitHub until npm publication is complete:
+Install the latest published and verified release, `v0.8.0`, directly from GitHub until npm publication is complete. Clone `main` to use the unreleased `0.8.1` examples and runbook:
 
 ```bash
 npm install https://github.com/InTheta/omni-universe-sdks/releases/download/v0.8.0/omni-terminal-sdk-0.8.0.tgz
@@ -35,6 +35,7 @@ Public Hyperliquid reads go directly to Hyperliquid. Omni API keys are used only
 | Guide | Contents |
 | --- | --- |
 | [TypeScript SDK reference](packages/typescript/README.md) | Installation, every REST/WS/x402/MCP connection, runtime validation and verification |
+| [Runnable example runbook](packages/typescript/docs/examples.md) | Every command, safe demo, required credential, side effect and expected completion behavior |
 | [Coinbase and Robinhood agent guide](packages/typescript/docs/trading-agents.md) | Complete setup, data flow, credentials, dry runs, live gates, custom agents and test matrix |
 | [Hyperliquid testnet agents](examples/testnet-agents/README.md) | Momentum, mean-reversion and Omni risk agents with a capped place/verify/cancel lifecycle |
 | [Security policy](SECURITY.md) | Private reporting and production credential guidance |
@@ -46,13 +47,17 @@ Public Hyperliquid reads go directly to Hyperliquid. Omni API keys are used only
 | [API-key REST and direct Hyperliquid reads](packages/typescript/examples/rest-api-key.ts) | `npm run example:rest` | Public reads; keyed calls only when a key is supplied |
 | [Direct Hyperliquid WebSocket](packages/typescript/examples/ws-market.ts) | `npm run example:ws` | Public market-data stream |
 | [Omni AI News WebSocket](packages/typescript/examples/ws-news.ts) | `npm run example:news-ws` | Requires an Omni API key and ticket |
+| Omni AI News offline demo | `npm run example:news-ws:demo` | No network or credentials |
 | [All nine x402 REST products](packages/typescript/examples/x402-all-routes.ts) | `npm run example:x402` | Free health only; no payment by default |
 | [All MCP tools](packages/typescript/examples/mcp-all-tools.ts) | `npm run example:mcp` | Free catalog; paid tools require explicit setup |
 | [Coinbase agent](packages/typescript/examples/agents/coinbase-agent.ts) | `npm run example:coinbase` | One explicitly approved research call; preview only |
+| Coinbase offline agent demo | `npm run example:coinbase:demo` | Deterministic research and mocked preview; no payment |
 | [Robinhood agent](packages/typescript/examples/agents/robinhood-agent.ts) | `npm run example:robinhood` | One explicitly approved research call; local order plan only |
+| Robinhood offline agent demo | `npm run example:robinhood:demo` | Deterministic research and local plan; no network or payment |
 | [Hyperliquid testnet momentum agent](examples/testnet-agents/agents/momentum-agent.ts) | `npm run example:momentum` in its package | Dry-run or HOLD |
 | [Hyperliquid testnet mean-reversion agent](examples/testnet-agents/agents/mean-reversion-agent.ts) | `npm run example:mean-reversion` in its package | Dry-run or HOLD |
 | [Omni risk to Hyperliquid testnet](examples/testnet-agents/agents/omni-risk-agent.ts) | `npm run example:omni-risk` in its package | Explicitly approved research; testnet dry-run by default |
+| Omni risk testnet demo | `npm run example:omni-risk:demo` in its package | Deterministic research plus public testnet dry-run |
 
 The [testnet-agent package](examples/testnet-agents) runs on Node.js 22.12+ and is pinned to Hyperliquid testnet. It defaults to dry-run previews, hard-caps testnet orders at `$25`, and includes read-only live tests, a signed unfunded contract probe, and an opt-in funded `place -> verify -> cancel` lifecycle.
 

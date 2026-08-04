@@ -1,7 +1,8 @@
 import { x402Client } from "@x402/core/client";
 import { createEvmPaymentClient, OmniX402Client } from "@omni-terminal/sdk";
 
-const runPaidExamples = process.env.RUN_PAID_EXAMPLES === "true";
+const freeOnly = process.argv.slice(2).includes("--free-only");
+const runPaidExamples = !freeOnly && process.env.RUN_PAID_EXAMPLES === "true";
 const privateKey = process.env.EVM_PRIVATE_KEY as `0x${string}` | undefined;
 
 if (runPaidExamples && !privateKey) {
@@ -21,7 +22,9 @@ console.log("news health", await client.newsHealth());
 console.log("trader profile health", await client.traderProfileHealth());
 
 if (!runPaidExamples) {
-  console.log("Set RUN_PAID_EXAMPLES=true to purchase each route once. No paid call was made.");
+  console.log(freeOnly
+    ? "Free-only mode: paid x402 routes were disabled regardless of environment."
+    : "Set RUN_PAID_EXAMPLES=true to purchase each route once. No paid call was made.");
   process.exit(0);
 }
 
