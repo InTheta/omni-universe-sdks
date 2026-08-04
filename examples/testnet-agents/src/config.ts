@@ -1,4 +1,5 @@
 export const HARD_MAX_TESTNET_NOTIONAL_USD = 25;
+export const MIN_TESTNET_NOTIONAL_USD = 10;
 export const TESTNET_ORDER_CONFIRMATION = "HYPERLIQUID_TESTNET_ONLY";
 
 export interface TestnetExecutionConfig {
@@ -21,8 +22,10 @@ export function readTestnetExecutionConfig(
   }
 
   const maxNotionalUsd = readNumber(env.TESTNET_MAX_NOTIONAL_USD, 15, "TESTNET_MAX_NOTIONAL_USD");
-  if (maxNotionalUsd < 10 || maxNotionalUsd > HARD_MAX_TESTNET_NOTIONAL_USD) {
-    throw new RangeError(`TESTNET_MAX_NOTIONAL_USD must be between 10 and ${HARD_MAX_TESTNET_NOTIONAL_USD}`);
+  if (maxNotionalUsd < MIN_TESTNET_NOTIONAL_USD || maxNotionalUsd > HARD_MAX_TESTNET_NOTIONAL_USD) {
+    throw new RangeError(
+      `TESTNET_MAX_NOTIONAL_USD must be between ${MIN_TESTNET_NOTIONAL_USD} and ${HARD_MAX_TESTNET_NOTIONAL_USD}`,
+    );
   }
   const minConfidence = readNumber(env.TESTNET_MIN_CONFIDENCE, 0.55, "TESTNET_MIN_CONFIDENCE");
   if (minConfidence < 0 || minConfidence > 1) {

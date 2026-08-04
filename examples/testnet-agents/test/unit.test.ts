@@ -2,7 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { HttpTransport } from "@nktkas/hyperliquid";
 import { readTestnetExecutionConfig, TESTNET_ORDER_CONFIRMATION } from "../src/config.js";
-import { assertTestnetTransport, createOrderPlan, HyperliquidTestnetExecutor } from "../src/hyperliquid-testnet.js";
+import {
+  assertTestnetTransport,
+  createOrderPlan,
+  HyperliquidTestnetExecutor,
+  waitForOrderClosed,
+} from "../src/hyperliquid-testnet.js";
 import { loadOmniMarketRisk } from "../src/omni-research.js";
 import { meanReversionIntent, momentumIntent } from "../src/strategies.js";
 
@@ -40,6 +45,10 @@ test("low-confidence directional signals are converted to HOLD before market loo
 
 test("executor refuses mainnet and order plans enforce the hard notional cap", () => {
   assert.throws(() => assertTestnetTransport(new HttpTransport()), /Refusing non-testnet/);
+  assert.throws(() => assertTestnetTransport({
+    apiUrl: "https://api.hyperliquid-testnet.xyz/?unexpected=true",
+    isTestnet: true,
+  } as Pick<HttpTransport, "apiUrl" | "isTestnet">), /Refusing non-testnet/);
   const intent = momentumIntent("BTC", [100, 101, 102, 103].map((c) => ({ c: String(c) })), 15);
   const plan = createOrderPlan(intent, { asset: 0, midPrice: 60_000, symbol: "BTC", szDecimals: 5 }, {
     maxNotionalUsd: 15,
@@ -48,12 +57,45 @@ test("executor refuses mainnet and order plans enforce the hard notional cap", (
   assert.equal(plan.network, "hyperliquid-testnet");
   assert.equal(plan.tif, "Alo");
   assert.ok(plan.notionalUsd <= 15);
+  assert.throws(() => createOrderPlan(intent, {
+    asset: 1,
+    midPrice: 3_000,
+    symbol: "ETH",
+    szDecimals: 4,
+  }, { maxNotionalUsd: 15, orderOffsetBps: 200 }), /does not match market symbol/);
+  assert.throws(() => createOrderPlan({ ...intent, maxNotionalUsd: 10 }, {
+    asset: 0,
+    midPrice: 60_000,
+    symbol: "BTC",
+    szDecimals: 5,
+  }, { maxNotionalUsd: 10, orderOffsetBps: 200 }), /Formatted order notional must be between 10 and 10 USD/);
   assert.throws(() => createOrderPlan({ ...intent, maxNotionalUsd: 26 }, {
     asset: 0,
     midPrice: 60_000,
     symbol: "BTC",
     szDecimals: 5,
   }, { maxNotionalUsd: 26, orderOffsetBps: 200 }), /between 10 and 25/);
+});
+
+test("cancellation verification tolerates bounded open-order propagation and then fails closed", async () => {
+  let reads = 0;
+  let sleeps = 0;
+  await waitForOrderClosed(async () => {
+    reads += 1;
+    return reads < 3 ? [{ oid: 42 }] : [];
+  }, 42, {
+    attempts: 3,
+    intervalMs: 0,
+    sleep: async () => { sleeps += 1; },
+  });
+  assert.equal(reads, 3);
+  assert.equal(sleeps, 2);
+
+  await assert.rejects(waitForOrderClosed(
+    async () => [{ oid: 42 }],
+    42,
+    { attempts: 2, intervalMs: 0, sleep: async () => undefined },
+  ), /remained open after 2 cancellation checks/);
 });
 
 test("Omni research cannot purchase without the explicit paid-research gate", async () => {

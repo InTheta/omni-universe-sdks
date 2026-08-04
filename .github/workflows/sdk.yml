@@ -83,9 +83,9 @@ jobs:
       - run: npm ci
       - run: npm run verify:live
 
-  testnet-signed-contract:
-    name: Hyperliquid testnet signed contract
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+  testnet-order-lifecycle:
+    name: Hyperliquid funded testnet lifecycle
+    if: github.event_name == 'workflow_dispatch'
     needs: testnet-agents
     runs-on: ubuntu-latest
     defaults:
@@ -104,5 +104,4 @@ jobs:
           cache: npm
           cache-dependency-path: examples/testnet-agents/package-lock.json
       - run: npm ci
-      - run: npm run test:signed
       - run: npm run test:order

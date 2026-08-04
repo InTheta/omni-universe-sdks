@@ -9,11 +9,11 @@ test("an ephemeral wallet signs a valid testnet order request that is rejected a
   const market = await testnet.market("BTC");
   const plan = createOrderPlan({
     confidence: 1,
-    maxNotionalUsd: 10,
+    maxNotionalUsd: 15,
     rationale: ["signed contract probe"],
     side: "BUY",
     symbol: "BTC",
-  }, market, { maxNotionalUsd: 10, orderOffsetBps: 300 });
+  }, market, { maxNotionalUsd: 15, orderOffsetBps: 300 });
   const wallet = privateKeyToAccount(generatePrivateKey());
   const exchange = new ExchangeClient({ transport: testnet.transport, wallet });
   await assert.rejects(exchange.order({

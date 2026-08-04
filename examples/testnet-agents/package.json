@@ -14,7 +14,7 @@
     "test:signed": "node --import tsx --test test/signed-contract.test.ts",
     "test:order": "node --env-file-if-exists=.env --import tsx --test test/order-lifecycle.test.ts",
     "verify": "npm run typecheck && npm test && npm audit --omit=dev",
-    "verify:live": "npm run verify && npm run test:live && npm run example:momentum && npm run example:mean-reversion",
+    "verify:live": "npm run verify && npm run test:live && npm run test:signed && npm run example:momentum && npm run example:mean-reversion",
     "example:momentum": "node --env-file-if-exists=.env --import tsx agents/momentum-agent.ts",
     "example:mean-reversion": "node --env-file-if-exists=.env --import tsx agents/mean-reversion-agent.ts",
     "example:omni-risk": "node --env-file-if-exists=.env --import tsx agents/omni-risk-agent.ts"

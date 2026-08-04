@@ -17,6 +17,7 @@
   },
   "files": [
     "dist",
+    "docs",
     "examples",
     "README.md",
     "LICENSE"
@@ -24,12 +25,14 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.examples.json --noEmit",
-    "test": "node --import tsx --test test/unit.test.ts test/boundary.test.ts",
+    "test": "node --import tsx --test test/unit.test.ts test/boundary.test.ts test/agents.test.ts",
+    "test:agents": "node --import tsx --test test/agents.test.ts",
     "test:live": "node --import tsx --test test/live.test.ts",
     "test:boundary": "tsx scripts/verify-public-boundary.ts .",
+    "test:docs": "tsx scripts/verify-docs.ts ../..",
     "test:package": "tsx scripts/verify-package.ts",
     "pack:check": "npm pack --dry-run --json",
-    "verify": "npm run typecheck && npm test && npm run build && npm run test:boundary && npm run test:package && npm audit --omit=dev",
+    "verify": "npm run typecheck && npm test && npm run build && npm run test:boundary && npm run test:docs && npm run test:package && npm audit --omit=dev",
     "verify:live": "npm run verify && npm run example:rest && npm run example:x402 && npm run test:live && npm run pack:check",
     "example:rest": "tsx examples/rest-api-key.ts",
     "example:ws": "tsx examples/ws-market.ts",

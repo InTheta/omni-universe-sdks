@@ -1,7 +1,11 @@
 import { ExchangeClient, HttpTransport, InfoClient, TESTNET_API_URL } from "@nktkas/hyperliquid";
 import { formatPrice, formatSize } from "@nktkas/hyperliquid/utils";
 import { privateKeyToAccount } from "viem/accounts";
-import { HARD_MAX_TESTNET_NOTIONAL_USD, type TestnetExecutionConfig } from "./config.js";
+import {
+  HARD_MAX_TESTNET_NOTIONAL_USD,
+  MIN_TESTNET_NOTIONAL_USD,
+  type TestnetExecutionConfig,
+} from "./config.js";
 import type { AgentIntent } from "./strategies.js";
 
 export interface TestnetMarketSnapshot {
@@ -115,11 +119,8 @@ export class HyperliquidTestnetExecutor {
       if (cancellation.response.data.statuses[0] !== "success") {
         throw new Error(`Testnet cancellation failed: ${JSON.stringify(cancellation.response.data.statuses[0])}`);
       }
+      await waitForOrderClosed(() => this.info.openOrders({ user: accountAddress }), orderId);
       cancelled = true;
-      const remaining = await this.info.openOrders({ user: accountAddress });
-      if (remaining.some((order) => order.oid === orderId)) {
-        throw new Error(`Testnet order ${orderId} remained open after cancellation`);
-      }
       return { cancelled: true, intent, mode: "testnet", orderId, plan };
     } finally {
       if (orderId !== undefined && !cancelled) {
@@ -135,9 +136,27 @@ export function createOrderPlan(
   config: Pick<TestnetExecutionConfig, "maxNotionalUsd" | "orderOffsetBps">,
 ): TestnetOrderPlan {
   if (intent.side === "HOLD") throw new Error("A HOLD intent cannot create an order");
+  if (intent.symbol !== market.symbol) {
+    throw new Error(`Intent symbol ${intent.symbol} does not match market symbol ${market.symbol}`);
+  }
+  if (!Number.isInteger(market.asset) || market.asset < 0) {
+    throw new RangeError("Market asset ID must be a non-negative integer");
+  }
+  if (!Number.isFinite(market.midPrice) || market.midPrice <= 0) {
+    throw new RangeError("Market midpoint must be a positive finite number");
+  }
+  if (!Number.isInteger(market.szDecimals) || market.szDecimals < 0 || market.szDecimals > 8) {
+    throw new RangeError("Market size decimals must be an integer between zero and eight");
+  }
   const requestedNotional = Math.min(intent.maxNotionalUsd, config.maxNotionalUsd);
-  if (!Number.isFinite(requestedNotional) || requestedNotional < 10 || requestedNotional > HARD_MAX_TESTNET_NOTIONAL_USD) {
-    throw new RangeError(`Order notional must be between 10 and ${HARD_MAX_TESTNET_NOTIONAL_USD}`);
+  if (
+    !Number.isFinite(requestedNotional)
+    || requestedNotional < MIN_TESTNET_NOTIONAL_USD
+    || requestedNotional > HARD_MAX_TESTNET_NOTIONAL_USD
+  ) {
+    throw new RangeError(
+      `Order notional must be between ${MIN_TESTNET_NOTIONAL_USD} and ${HARD_MAX_TESTNET_NOTIONAL_USD}`,
+    );
   }
   if (!Number.isInteger(config.orderOffsetBps) || config.orderOffsetBps < 50 || config.orderOffsetBps > 500) {
     throw new RangeError("Order offset must be an integer between 50 and 500 basis points");
@@ -148,8 +167,14 @@ export function createOrderPlan(
   const price = formatPrice(market.midPrice * multiplier, market.szDecimals);
   const size = formatSize(requestedNotional / Number(price), market.szDecimals);
   const notionalUsd = Number(price) * Number(size);
-  if (!Number.isFinite(notionalUsd) || notionalUsd <= 0 || notionalUsd > HARD_MAX_TESTNET_NOTIONAL_USD) {
-    throw new RangeError("Formatted order violates the hard testnet notional ceiling");
+  if (
+    !Number.isFinite(notionalUsd)
+    || notionalUsd < MIN_TESTNET_NOTIONAL_USD
+    || notionalUsd > requestedNotional + 1e-9
+  ) {
+    throw new RangeError(
+      `Formatted order notional must be between ${MIN_TESTNET_NOTIONAL_USD} and ${requestedNotional} USD`,
+    );
   }
   return {
     asset: market.asset,
@@ -166,7 +191,42 @@ export function createOrderPlan(
 
 export function assertTestnetTransport(transport: Pick<HttpTransport, "apiUrl" | "isTestnet">): void {
   const url = new URL(String(transport.apiUrl));
-  if (!transport.isTestnet || url.origin !== TESTNET_API_URL || url.pathname !== "/") {
+  if (
+    !transport.isTestnet
+    || url.origin !== TESTNET_API_URL
+    || url.pathname !== "/"
+    || url.search !== ""
+    || url.hash !== ""
+    || url.username !== ""
+    || url.password !== ""
+  ) {
     throw new Error(`Refusing non-testnet Hyperliquid transport: ${url.href}`);
   }
+}
+
+export async function waitForOrderClosed(
+  fetchOpenOrders: () => Promise<readonly { oid: number }[]>,
+  orderId: number,
+  options: {
+    attempts?: number;
+    intervalMs?: number;
+    sleep?: (milliseconds: number) => Promise<void>;
+  } = {},
+): Promise<void> {
+  const attempts = options.attempts ?? 8;
+  const intervalMs = options.intervalMs ?? 250;
+  const sleep = options.sleep ?? ((milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds)));
+  if (!Number.isInteger(attempts) || attempts < 1 || attempts > 20) {
+    throw new RangeError("Cancellation verification attempts must be an integer between one and twenty");
+  }
+  if (!Number.isInteger(intervalMs) || intervalMs < 0 || intervalMs > 5_000) {
+    throw new RangeError("Cancellation verification interval must be an integer between zero and 5000 milliseconds");
+  }
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const openOrders = await fetchOpenOrders();
+    if (!openOrders.some((order) => order.oid === orderId)) return;
+    if (attempt < attempts) await sleep(intervalMs);
+  }
+  throw new Error(`Testnet order ${orderId} remained open after ${attempts} cancellation checks`);
 }

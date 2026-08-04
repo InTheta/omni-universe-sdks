@@ -22,7 +22,7 @@ cp .env.example .env
 npm run verify:live
 ```
 
-`verify:live` runs the two public-data agents against real testnet market data but submits no order. `npm run test:signed` generates an ephemeral unfunded key, signs a real testnet exchange request, and verifies that testnet identifies it as an unknown or unfunded account rather than rejecting the signature; no order is accepted.
+`verify:live` runs the two public-data agents against real testnet market data and generates an ephemeral unfunded key for a signed exchange-contract probe. Testnet must identify that request as coming from an unknown or unfunded account rather than reject its signature; no order is accepted. The probe is also available separately as `npm run test:signed`.
 
 Run individual agents:
 
