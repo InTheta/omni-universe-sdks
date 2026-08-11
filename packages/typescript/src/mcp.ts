@@ -3,7 +3,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { x402Client } from "@x402/core/client";
 import { wrapMCPClientWithPayment, type PaymentRequestedContext, type SettleResponse, type x402MCPClient, type x402MCPToolCallResult } from "@x402/mcp";
 import { OmniContractError } from "./errors.js";
-import type { EntityResolution, MarketCarry, MarketRisk, NewsPulse } from "./types.js";
+import type { EntityResolution, MarketCarry, MarketRisk, NewsPulse, PremarketRoundup } from "./types.js";
 import { createEvmPaymentClient, DEFAULT_MAX_X402_PAYMENT_USD, validatePaymentSettlement } from "./x402.js";
 
 export type OmniMcpToolName =
@@ -11,7 +11,8 @@ export type OmniMcpToolName =
   | "get_market_moving_events"
   | "get_market_risk_context"
   | "resolve_market_entities"
-  | "get_market_carry";
+  | "get_market_carry"
+  | "get_premarket_roundup";
 
 export const SDK_VERSION = "0.8.1";
 
@@ -134,6 +135,14 @@ export class OmniMcpClient {
     return this.callJsonTool("get_market_carry", { symbol });
   }
 
+  premarketRoundup(limit = 1): Promise<x402MCPToolCallResult> {
+    return this.callTool("get_premarket_roundup", { limit });
+  }
+
+  premarketRoundupData(limit = 1): Promise<OmniMcpDataResult<PremarketRoundup>> {
+    return this.callJsonTool("get_premarket_roundup", { limit });
+  }
+
   async close(): Promise<void> {
     await this.client.close();
   }
@@ -145,6 +154,7 @@ const mcpToolContracts: Record<OmniMcpToolName, { service: string; schema?: stri
   get_market_risk_context: { service: "omni.market_risk_snapshot", schema: "market_risk_snapshot.v1" },
   resolve_market_entities: { service: "omni.market_entity_resolution", schema: "market_entity_resolution.v1", requiredCollection: "results" },
   get_market_carry: { service: "omni.hyperliquid_market_carry", schema: "hyperliquid_market_carry.v1" },
+  get_premarket_roundup: { service: "omni.premarket_roundup", schema: "premarket_roundup.v1", requiredCollection: "items" },
 };
 
 export function validateMcpToolResult(
@@ -251,6 +261,10 @@ export function validateMcpToolArguments(
     case "get_market_carry":
       assertOnlyKeys(name, input, ["symbol"]);
       return { symbol: normalizeString("symbol", input.symbol, 2, 15) };
+    case "get_premarket_roundup":
+      assertOnlyKeys(name, input, ["limit"]);
+      assertOptionalInteger("limit", input.limit, 1, 5);
+      return { limit: input.limit ?? 1 };
   }
 }
 

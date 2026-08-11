@@ -13,6 +13,7 @@ import type {
   NewsPulse,
   PaidResult,
   PaymentReceipt,
+  PremarketRoundup,
   TraderLeaderboard,
   TraderProfile,
   X402Health,
@@ -251,6 +252,18 @@ export class OmniX402Client {
     assertSymbol(symbol);
     return this.request("GET", `/api/x402/v1/market-carry/${symbol}`, {
       contract: { service: "omni.hyperliquid_market_carry", schema: "hyperliquid_market_carry.v1" },
+    });
+  }
+
+  premarketRoundup(limit = 1): Promise<PaidResult<PremarketRoundup>> {
+    assertOptionalInteger("limit", limit, 1, 5);
+    return this.request("GET", "/api/x402/v1/research/premarket", {
+      query: { limit },
+      contract: {
+        service: "omni.premarket_roundup",
+        schema: "premarket_roundup.v1",
+        requiredCollection: "items",
+      },
     });
   }
 }

@@ -19,13 +19,14 @@ try {
   if (freeOnly || !process.env.EVM_PRIVATE_KEY || process.env.RUN_PAID_EXAMPLES !== "true") {
     console.log(freeOnly
       ? "Free-only mode: paid MCP tools were disabled regardless of environment."
-      : "Set EVM_PRIVATE_KEY and RUN_PAID_EXAMPLES=true to purchase the four paid MCP tools.");
+      : "Set EVM_PRIVATE_KEY and RUN_PAID_EXAMPLES=true to purchase the five paid MCP tools.");
     process.exitCode = 0;
   } else {
     console.log("events", await client.marketMovingEventsData({ symbol: "BTC", market: "crypto", limit: 3 }));
     console.log("risk", await client.marketRiskData({ symbol: "BTC", scope: "current", limit: 3 }));
     console.log("resolution", await client.resolveEntitiesData(["bitcoin", "BTC-PERP"]));
     console.log("carry", await client.marketCarryData("BTC"));
+    console.log("premarket roundup", await client.premarketRoundupData(1));
   }
 } finally {
   await client.close();

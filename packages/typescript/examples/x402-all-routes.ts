@@ -39,6 +39,7 @@ const calls = [
   ["market snapshot", () => client.marketSnapshot("BTC", { interval: "1h", limit: 20 })],
   ["entity resolution", () => client.resolveSymbols(["bitcoin", "BTC-PERP"])],
   ["market carry", () => client.marketCarry("BTC")],
+  ["pre-market roundup", () => client.premarketRoundup(1)],
 ] as const;
 
 for (const [name, call] of calls) {

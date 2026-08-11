@@ -1,4 +1,5 @@
 export * from "./agent.js";
+export * from "./bundles.js";
 export * from "./errors.js";
 export * from "./hyperliquid.js";
 export * from "./hyperliquid-ws.js";
