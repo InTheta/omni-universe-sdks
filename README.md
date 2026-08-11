@@ -37,6 +37,7 @@ Public Hyperliquid reads go directly to Hyperliquid. Omni API keys are used only
 | [TypeScript SDK reference](packages/typescript/README.md) | Installation, every REST/WS/x402/MCP connection, runtime validation and verification |
 | [Runnable example runbook](packages/typescript/docs/examples.md) | Every command, safe demo, required credential, side effect and expected completion behavior |
 | [Coinbase and Robinhood agent guide](packages/typescript/docs/trading-agents.md) | Complete setup, data flow, credentials, dry runs, live gates, custom agents and test matrix |
+| [Agentic trading zero-to-one](packages/typescript/docs/agentic-trading-0-to-1.md) | Coinbase Agentic Wallet x402 discovery/payment, Omni evidence, Robinhood Trading MCP, and runnable broker adapters |
 | [Hyperliquid testnet agents](examples/testnet-agents/README.md) | Momentum, mean-reversion and Omni risk agents with a capped place/verify/cancel lifecycle |
 | [Security policy](SECURITY.md) | Private reporting and production credential guidance |
 
@@ -50,9 +51,10 @@ Public Hyperliquid reads go directly to Hyperliquid. Omni API keys are used only
 | Omni AI News offline demo | `npm run example:news-ws:demo` | No network or credentials |
 | [All nine x402 REST products](packages/typescript/examples/x402-all-routes.ts) | `npm run example:x402` | Free health only; no payment by default |
 | [All MCP tools](packages/typescript/examples/mcp-all-tools.ts) | `npm run example:mcp` | Free catalog; paid tools require explicit setup |
-| [Coinbase agent](packages/typescript/examples/agents/coinbase-agent.ts) | `npm run example:coinbase` | One explicitly approved research call; preview only |
+| [Coinbase agent](packages/typescript/examples/agents/coinbase-agent.ts) | `npm run example:coinbase` | One call, or dual x402 REST + MCP evidence; preview only |
+| [Zero-to-one offline flow](packages/typescript/examples/agents/zero-to-one-demo.ts) | `npm run example:agentic-flow:demo` | Bazaar + native MCP contracts, deterministic evidence, Coinbase preview and Robinhood local plan; no spend |
 | Coinbase offline agent demo | `npm run example:coinbase:demo` | Deterministic research and mocked preview; no payment |
-| [Robinhood agent](packages/typescript/examples/agents/robinhood-agent.ts) | `npm run example:robinhood` | One explicitly approved research call; local order plan only |
+| [Robinhood agent](packages/typescript/examples/agents/robinhood-agent.ts) | `npm run example:robinhood` | One call, or dual x402 REST + MCP evidence; local Crypto order plan only |
 | Robinhood offline agent demo | `npm run example:robinhood:demo` | Deterministic research and local plan; no network or payment |
 | [Hyperliquid testnet momentum agent](examples/testnet-agents/agents/momentum-agent.ts) | `npm run example:momentum` in its package | Dry-run or HOLD |
 | [Hyperliquid testnet mean-reversion agent](examples/testnet-agents/agents/mean-reversion-agent.ts) | `npm run example:mean-reversion` in its package | Dry-run or HOLD |
@@ -70,7 +72,7 @@ npm run verify
 npm run test:live
 ```
 
-`test:live` spends nothing and submits no broker order. Broker agents require `RUN_PAID_RESEARCH=true` before their single capped research purchase. A real broker order additionally requires `LIVE_TRADING=true` and the broker-specific `CONFIRM_LIVE_ORDER` value documented in the [agent guide](packages/typescript/docs/trading-agents.md).
+`test:live` spends nothing and submits no broker order. Broker agents require `RUN_PAID_RESEARCH=true` before capped research purchases; dual transport additionally requires the exact `0.013` session declaration. A real broker order additionally requires `LIVE_TRADING=true` and the broker-specific `CONFIRM_LIVE_ORDER` value documented in the [agent guide](packages/typescript/docs/trading-agents.md).
 
 `npm run verify` also packs the SDK, installs that tarball into a clean temporary consumer project, and imports both the root SDK and broker entrypoint. This catches missing build output, export drift, accidental source/test publication, and package-version mismatches before release.
 

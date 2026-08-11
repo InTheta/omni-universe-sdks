@@ -2,6 +2,7 @@ import {
   createEvmPaymentClient,
   OmniMcpClient,
   OmniX402Client,
+  type MarketCarry,
   type MarketRisk,
   type X402Symbol,
 } from "@omni-terminal/sdk";
@@ -11,12 +12,40 @@ import { demoMarketRisk } from "./demo.js";
 export async function loadMarketRisk(symbol: X402Symbol, options: { demo?: boolean } = {}): Promise<{
   data: MarketRisk;
   payment: unknown;
-  transport: "demo-fixture" | "x402-rest" | "x402-mcp";
+  supportingEvidence?: MarketCarry;
+  supportingPayment?: unknown;
+  transport: "demo-fixture" | "x402-rest" | "x402-mcp" | "x402-rest+mcp";
 }> {
   if (options.demo) {
     return { data: demoMarketRisk(symbol), payment: null, transport: "demo-fixture" };
   }
   const config = readAgentResearchConfig();
+
+  if (config.transport === "both") {
+    const rest = new OmniX402Client({
+      baseUrl: process.env.OMNI_APP_URL,
+      paymentClient: createEvmPaymentClient(config.privateKey, { maxPaymentUsd: config.maxPaymentUsd }),
+    });
+    const risk = await rest.marketRisk(symbol, { scope: "current", limit: 5 });
+    const mcp = await new OmniMcpClient({
+      url: process.env.OMNI_MCP_URL,
+      privateKey: config.privateKey,
+      maxPaymentUsd: config.maxPaymentUsd,
+      approvePayment: () => true,
+    }).connect();
+    try {
+      const carry = await mcp.marketCarryData(symbol);
+      return {
+        data: risk.data,
+        payment: risk.payment,
+        supportingEvidence: carry.data,
+        supportingPayment: carry.payment,
+        transport: "x402-rest+mcp",
+      };
+    } finally {
+      await mcp.close();
+    }
+  }
 
   if (config.transport === "mcp") {
     const mcp = await new OmniMcpClient({

@@ -1,6 +1,6 @@
 # Building Coinbase and Robinhood agents with Omni data
 
-This guide takes an agent from market research to a guarded Coinbase Advanced Trade or Robinhood Crypto order. The examples are runnable TypeScript programs, not pseudocode. They default to no broker submission and keep the x402 buyer key, Omni API key, and broker credentials in separate trust domains.
+This guide takes an agent from market research to a guarded Coinbase Advanced Trade or Robinhood Crypto order. The examples are runnable TypeScript programs, not pseudocode. Robinhood's separate OAuth-based Agentic Trading MCP is covered in [the zero-to-one runbook](agentic-trading-0-to-1.md). All paths default to no broker submission and keep the x402 buyer key, Omni API key, and broker credentials in separate trust domains.
 
 These examples demonstrate integration and safety mechanics. They are not profitable strategies or investment advice.
 
@@ -58,13 +58,14 @@ The included agents make one paid `market-risk` request before deciding. Use a s
 ```dotenv
 OMNI_APP_URL=https://omniterminal.app
 OMNI_MCP_URL=https://omniterminal.app/api/x402/mcp
-OMNI_RESEARCH_TRANSPORT=x402
+OMNI_RESEARCH_TRANSPORT=both
 EVM_PRIVATE_KEY=0x...
 X402_MAX_PAYMENT_USD=0.01
+X402_MAX_RESEARCH_SESSION_USD=0.013
 RUN_PAID_RESEARCH=true
 ```
 
-Set `OMNI_RESEARCH_TRANSPORT=mcp` to use MCP instead of x402 REST. Both paths call the same bounded product contract. `RUN_PAID_RESEARCH=true` is mandatory, and the example refuses a ceiling above `$0.01` per call.
+Set `OMNI_RESEARCH_TRANSPORT=x402` or `mcp` to buy one Market Risk result through one transport. Set it to `both` to buy Market Risk over x402 REST (`0.010`) plus Market Carry over native x402 MCP (`0.003`). Combined mode requires the exact `0.013` session declaration. `RUN_PAID_RESEARCH=true` is mandatory, and every call refuses a ceiling above `$0.01`.
 
 To inspect all unpaid product challenges without spending:
 
@@ -179,8 +180,9 @@ The live client signs the exact transmitted JSON body with Ed25519 and sends `x-
 | `npm run test:examples` | No | Mocked/local only | No |
 | `npm run test:live` | No | No | No |
 | `npm run example:x402` | No by default | No | No |
-| Broker agent with `RUN_PAID_RESEARCH=true`, `LIVE_TRADING=false` | One research call | Coinbase preview only; Robinhood none | No |
-| Broker agent with both exact live-order gates | One research call | Yes | Yes |
+| Broker agent with one transport, `RUN_PAID_RESEARCH=true`, `LIVE_TRADING=false` | One research call | Coinbase preview only; Robinhood none | No |
+| Broker agent with `OMNI_RESEARCH_TRANSPORT=both`, `LIVE_TRADING=false` | Two research calls, max 0.013 USDC | Coinbase preview only; Robinhood none | No |
+| Broker agent with exact research and live-order gates | One or two research calls | Yes | Yes |
 | Hyperliquid testnet lifecycle in `examples/testnet-agents` | Optional research | Hyperliquid testnet only | Testnet only |
 
 Never put live-order confirmations in a committed `.env` file or shared CI configuration. CI should exercise mocked broker submission contracts and read-only/unpaid live contracts. Run funded workflows only in a protected, manually approved environment.

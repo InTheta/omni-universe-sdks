@@ -2,6 +2,7 @@ import type { X402Symbol } from "@omni-terminal/sdk";
 
 export const HARD_MAX_AGENT_ORDER_NOTIONAL_USD = 100;
 export const HARD_MAX_AGENT_RESEARCH_PAYMENT_USD = 0.01;
+export const DUAL_TRANSPORT_RESEARCH_BUDGET_USD = 0.013;
 
 export type BrokerAgentName = "coinbase" | "robinhood";
 
@@ -13,8 +14,9 @@ export interface BrokerAgentConfig {
 
 export interface AgentResearchConfig {
   maxPaymentUsd: number;
+  maxSessionPaymentUsd: number;
   privateKey: `0x${string}`;
-  transport: "mcp" | "x402";
+  transport: "both" | "mcp" | "x402";
 }
 
 const confirmations: Record<BrokerAgentName, string> = {
@@ -72,8 +74,25 @@ export function readAgentResearchConfig(env: NodeJS.ProcessEnv = process.env): A
     );
   }
   const transport = env.OMNI_RESEARCH_TRANSPORT ?? "x402";
-  if (transport !== "x402" && transport !== "mcp") {
-    throw new Error("OMNI_RESEARCH_TRANSPORT must be x402 or mcp");
+  if (transport !== "x402" && transport !== "mcp" && transport !== "both") {
+    throw new Error("OMNI_RESEARCH_TRANSPORT must be x402, mcp, or both");
   }
-  return { maxPaymentUsd, privateKey: privateKey as `0x${string}`, transport };
+  const maxSessionPaymentUsd = Number(
+    env.X402_MAX_RESEARCH_SESSION_USD
+      ?? (transport === "both" ? String(DUAL_TRANSPORT_RESEARCH_BUDGET_USD) : String(maxPaymentUsd)),
+  );
+  if (!Number.isFinite(maxSessionPaymentUsd) || maxSessionPaymentUsd <= 0) {
+    throw new RangeError("X402_MAX_RESEARCH_SESSION_USD must be greater than zero");
+  }
+  if (transport === "both" && maxSessionPaymentUsd !== DUAL_TRANSPORT_RESEARCH_BUDGET_USD) {
+    throw new RangeError(
+      `OMNI_RESEARCH_TRANSPORT=both requires X402_MAX_RESEARCH_SESSION_USD=${DUAL_TRANSPORT_RESEARCH_BUDGET_USD}`,
+    );
+  }
+  return {
+    maxPaymentUsd,
+    maxSessionPaymentUsd,
+    privateKey: privateKey as `0x${string}`,
+    transport,
+  };
 }
