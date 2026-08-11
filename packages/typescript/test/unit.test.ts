@@ -6,6 +6,7 @@ import WebSocket from "ws";
 import { encodePaymentResponseHeader } from "@x402/core/http";
 import {
   createEvmPaymentClient,
+  createAskOmniBundlePlan,
   decideFromMarketRisk,
   HyperliquidPublicClient,
   HyperliquidWebSocketClient,
@@ -30,6 +31,7 @@ test("MCP client can use its public default endpoint without an options object",
 test("MCP paid tool arguments are rejected and normalized before payment", () => {
   assert.deepEqual(validateMcpToolArguments("get_market_catalog"), {});
   assert.deepEqual(validateMcpToolArguments("get_market_carry", { symbol: " BTC " }), { symbol: "BTC" });
+  assert.deepEqual(validateMcpToolArguments("get_premarket_roundup", {}), { limit: 1 });
   assert.deepEqual(validateMcpToolArguments("resolve_market_entities", { mentions: [" bitcoin "] }), {
     mentions: ["bitcoin"],
     venue: "hyperliquid",
@@ -45,6 +47,10 @@ test("MCP paid tool arguments are rejected and normalized before payment", () =>
   assert.throws(
     () => validateMcpToolArguments("resolve_market_entities", { mentions: [] }),
     /mentions must contain between 1 and 20/,
+  );
+  assert.throws(
+    () => validateMcpToolArguments("get_premarket_roundup", { limit: 6 }),
+    /limit must be an integer between 1 and 5/,
   );
 });
 
@@ -114,7 +120,25 @@ test("x402 client rejects invalid paid calls before invoking fetch", () => {
   assert.throws(() => client.symbolNews("BTC", { nearest_timestamp: 10_000_000_000_000 }), /13-digit Unix timestamp/);
   assert.throws(() => client.resolveSymbols([]), /mentions must contain between 1 and 20/);
   assert.throws(() => client.resolveSymbols([" "]), /mentions\[0\] must contain 1 to 100/);
+  assert.throws(() => client.premarketRoundup(6), /limit must be an integer between 1 and 5/);
   assert.equal(fetchCalls, 0);
+});
+
+test("Ask Omni bundle plans keep costs bounded and execution separate", () => {
+  const brief = createAskOmniBundlePlan({ symbol: "BTC", tier: "brief" });
+  assert.equal(brief.estimatedCostUsdc, "0.016");
+  assert.deepEqual(brief.steps.map((step) => step.id), [
+    "published_roundup",
+    "moving_events",
+    "market_risk",
+  ]);
+  const deep = createAskOmniBundlePlan({ symbol: "BTC", tier: "deep", mention: "bitcoin" });
+  assert.equal(deep.estimatedCostUsdc, "0.030");
+  assert.equal(deep.steps[0]?.id, "resolve_entities");
+  assert.equal(deep.executionBoundary.placesOrders, false);
+  const visual = createAskOmniBundlePlan({ symbol: "ETH", tier: "visual", mention: "ether" });
+  assert.equal(visual.estimatedCostUsdc, "0.040");
+  assert.equal(visual.steps.at(-1)?.parallelGroup, 2);
 });
 
 test("x402 client fails closed on a mismatched paid product body", async () => {

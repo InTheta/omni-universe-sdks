@@ -51,9 +51,11 @@ The `:public` and `:free` commands override payment and API-key flags from `.env
 | `npm run example:news-ws:demo` | No | No | No | No | No | One deterministic frame, then exits |
 | `npm run example:news-ws` | Yes | `OMNI_API_KEY` | No x402 payment | No | No | Five authenticated news frames, then exits |
 | `npm run example:x402:free` | Yes | No | No | No | No | Two free health contracts, then exits |
-| `npm run example:x402` | Yes | Buyer key only when paid mode is enabled | Only with `RUN_PAID_EXAMPLES=true` | No | No | Free health or all nine paid products, then exits |
+| `npm run example:x402` | Yes | Buyer key only when paid mode is enabled | Only with `RUN_PAID_EXAMPLES=true` | No | No | Free health or all ten paid JSON products, then exits |
 | `npm run example:mcp:free` | Yes | No | No | No | No | Free MCP catalog, then exits |
-| `npm run example:mcp` | Yes | Buyer key only when paid mode is enabled | Only with `RUN_PAID_EXAMPLES=true` | No | No | Free catalog or four paid tools, then exits |
+| `npm run example:mcp` | Yes | Buyer key only when paid mode is enabled | Only with `RUN_PAID_EXAMPLES=true` | No | No | Free catalog or five paid tools, then exits |
+| `npm run example:ask-omni:demo` | No | No | No | No | No | Prints the 0.016-0.040 USDC bundle plan and deterministic evidence |
+| `npm run example:ask-omni` | Yes | Dedicated buyer key | Only with `RUN_PAID_ASK_OMNI_BUNDLE=yes` | No | No | Executes one bounded brief/deep/visual research bundle |
 | `npm run example:coinbase:demo` | No | No | No | Mocked preview | No | Deterministic BUY and preview, then exits |
 | `npm run example:coinbase` | Yes | Buyer wallet and Coinbase key | One call, or two with `both` | Authenticated preview | Only with both live gates | One decision, then exits |
 | `npm run example:robinhood:demo` | No | No | No | No network | No | Deterministic BUY and local order plan, then exits |
@@ -84,10 +86,10 @@ RUN_PAID_EXAMPLES=true
 Then choose one transport:
 
 ```bash
-# Purchases each of the nine REST products once.
+# Purchases each of the ten JSON REST products once.
 npm run example:x402
 
-# Purchases each of the four paid MCP tools once.
+# Purchases each of the five paid MCP tools once.
 npm run example:mcp
 ```
 

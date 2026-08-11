@@ -38,6 +38,7 @@ Public Hyperliquid reads go directly to Hyperliquid. Omni API keys are used only
 | [Runnable example runbook](packages/typescript/docs/examples.md) | Every command, safe demo, required credential, side effect and expected completion behavior |
 | [Coinbase and Robinhood agent guide](packages/typescript/docs/trading-agents.md) | Complete setup, data flow, credentials, dry runs, live gates, custom agents and test matrix |
 | [Agentic trading zero-to-one](packages/typescript/docs/agentic-trading-0-to-1.md) | Coinbase Agentic Wallet x402 discovery/payment, Omni evidence, Robinhood Trading MCP, and runnable broker adapters |
+| [Ask Omni research bundles](packages/typescript/docs/ask-omni-bundles.md) | Agentic Market-style 0.016-0.040 USDC recipes combining the published roundup, live MCP tools, HTTP products, receipts, and broker handoff |
 | [Hyperliquid testnet agents](examples/testnet-agents/README.md) | Momentum, mean-reversion and Omni risk agents with a capped place/verify/cancel lifecycle |
 | [Security policy](SECURITY.md) | Private reporting and production credential guidance |
 
@@ -49,8 +50,9 @@ Public Hyperliquid reads go directly to Hyperliquid. Omni API keys are used only
 | [Direct Hyperliquid WebSocket](packages/typescript/examples/ws-market.ts) | `npm run example:ws` | Public market-data stream |
 | [Omni AI News WebSocket](packages/typescript/examples/ws-news.ts) | `npm run example:news-ws` | Requires an Omni API key and ticket |
 | Omni AI News offline demo | `npm run example:news-ws:demo` | No network or credentials |
-| [All nine x402 REST products](packages/typescript/examples/x402-all-routes.ts) | `npm run example:x402` | Free health only; no payment by default |
-| [All MCP tools](packages/typescript/examples/mcp-all-tools.ts) | `npm run example:mcp` | Free catalog; paid tools require explicit setup |
+| [All ten x402 JSON products](packages/typescript/examples/x402-all-routes.ts) | `npm run example:x402` | Free health only; no payment by default |
+| [All MCP tools](packages/typescript/examples/mcp-all-tools.ts) | `npm run example:mcp` | Free catalog; five paid tools require explicit setup |
+| [Ask Omni bundle](packages/typescript/examples/agents/ask-omni-bundle.ts) | `npm run example:ask-omni:demo` | Full bundle plan and deterministic no-spend output; paid mode is separately armed |
 | [Coinbase agent](packages/typescript/examples/agents/coinbase-agent.ts) | `npm run example:coinbase` | One call, or dual x402 REST + MCP evidence; preview only |
 | [Zero-to-one offline flow](packages/typescript/examples/agents/zero-to-one-demo.ts) | `npm run example:agentic-flow:demo` | Bazaar + native MCP contracts, deterministic evidence, Coinbase preview and Robinhood local plan; no spend |
 | Coinbase offline agent demo | `npm run example:coinbase:demo` | Deterministic research and mocked preview; no payment |

@@ -420,6 +420,38 @@ export interface MarketRisk {
   usage: { event_window_minutes: 15 | 60; component_limit: number };
 }
 
+export interface PublishedPremarketRoundup {
+  title: string;
+  subtitle: string;
+  excerpt: string;
+  published_at: string;
+  canonical_url: string;
+  kind: "pre_market_roundup";
+  topics: string[];
+  word_count: number | null;
+}
+
+export interface PremarketRoundup {
+  service: "omni.premarket_roundup";
+  product_version: "v1";
+  schema: "premarket_roundup.v1";
+  generated_at: string;
+  data_as_of: string;
+  freshness: Freshness;
+  publication: {
+    name: "OmniTerminal";
+    archive_url: string;
+  };
+  items: PublishedPremarketRoundup[];
+  usage: {
+    item_count: number;
+    item_limit: number;
+    examined_count: number;
+    excerpt_character_limit: number;
+    full_article_included: false;
+  };
+}
+
 export interface PaymentReceipt {
   success?: boolean;
   transaction?: string;

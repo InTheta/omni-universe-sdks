@@ -110,7 +110,7 @@ for await (const event of ws.news(ticket)) console.log(event.data);
 
 The news client sends a JSON ping every 55 seconds, inside the documented 60-second recommendation and 120-second idle timeout. Its receive queue is bounded to 1,000 frames by default and can be changed with `maxQueueSize`; when full, the oldest frame is discarded.
 
-## x402 REST — all nine paid routes
+## x402 REST — all ten paid JSON routes
 
 ```ts
 import { createEvmPaymentClient, OmniX402Client } from "@omni-terminal/sdk";
@@ -134,6 +134,7 @@ const { data, payment } = await paid.marketRisk("BTC", { scope: "current", limit
 | `GET /api/x402/v1/market-snapshot/{symbol}` | `marketSnapshot()` |
 | `POST /api/x402/v1/symbols/resolve` | `resolveSymbols()` |
 | `GET /api/x402/v1/market-carry/{symbol}` | `marketCarry()` |
+| `GET /api/x402/v1/research/premarket` | `premarketRoundup()` |
 
 Paid methods return contract-shaped TypeScript objects. They validate runtime symbols, addresses, limits, filters, timestamps, and entity batches before invoking the payment-aware fetch layer, then verify product service/schema discriminants and require a successful `PAYMENT-RESPONSE` settlement with a transaction and network. Invalid requests cannot trigger avoidable payment attempts, and response or settlement-contract drift fails closed.
 
@@ -158,10 +159,13 @@ console.log(await mcp.marketMovingEventsData({ symbol: "BTC" }));
 console.log(await mcp.marketRiskData({ symbol: "BTC" }));
 console.log(await mcp.resolveEntitiesData(["bitcoin"]));
 console.log(await mcp.marketCarryData("BTC"));
+console.log(await mcp.premarketRoundupData(1));
 await mcp.close();
 ```
 
-Paid MCP calls are denied by default. Supply an `approvePayment` callback so the application owns the spending decision. The payment client independently enforces `maxPaymentUsd`, even if the callback approves a larger challenge. The SDK validates every live tool's required fields, ranges, enums, batch sizes, and allowed property names before the payment-aware MCP client is invoked. Paid results must contain a successful settlement receipt, and the `*Data()` helpers parse and validate each product's JSON service/schema contract. Raw `callTool()` and non-`Data` helpers remain available. The free catalog is never allowed to trigger payment. `npm run example:mcp` targets the free catalog and all four paid tools.
+Paid MCP calls are denied by default. Supply an `approvePayment` callback so the application owns the spending decision. The payment client independently enforces `maxPaymentUsd`, even if the callback approves a larger challenge. The SDK validates every live tool's required fields, ranges, enums, batch sizes, and allowed property names before the payment-aware MCP client is invoked. Paid results must contain a successful settlement receipt, and the `*Data()` helpers parse and validate each product's JSON service/schema contract. Raw `callTool()` and non-`Data` helpers remain available. The free catalog is never allowed to trigger payment. `npm run example:mcp` targets the free catalog and all five paid tools.
+
+Use [`docs/ask-omni-bundles.md`](docs/ask-omni-bundles.md) and `npm run example:ask-omni:demo` for the Agentic Market-style brief, deep, and visual recipes. The no-spend demo prints the full plan; paid mode is separately armed and capped at 0.050 USDC.
 
 ## Trading agents
 
@@ -201,7 +205,7 @@ npm run test:live
 npm audit --omit=dev
 ```
 
-`npm run verify:live` uses the forced `example:rest:public`, `example:x402:free`, and `example:mcp:free` variants. They ignore keyed/payment flags from `.env`, spend nothing, and submit no order. The live tests verify Omni health, direct Hyperliquid instruments/candles/WebSocket data, the published REST/x402 route boundary, every MCP tool, and valid unpaid challenges from all nine x402 routes.
+`npm run verify:live` uses the forced `example:rest:public`, `example:x402:free`, and `example:mcp:free` variants. They ignore keyed/payment flags from `.env`, spend nothing, and submit no order. The live tests verify Omni health, direct Hyperliquid instruments/candles/WebSocket data, the published REST/x402 route boundary, every MCP tool, and valid unpaid challenges from all ten JSON x402 routes.
 
 `npm run verify` additionally creates the real npm tarball, checks its allowlisted contents, installs it into a clean temporary consumer project, and imports the public root and broker subpath exports. This is stronger than a packaging dry run and detects version/export drift from the artifact consumers actually receive.
 
