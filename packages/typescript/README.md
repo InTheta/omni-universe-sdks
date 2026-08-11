@@ -43,7 +43,7 @@ Node.js 20.19 or newer is required. The examples can also be run directly with N
 node --env-file=.env --import tsx examples/rest-api-key.ts
 ```
 
-For a complete research-to-order walkthrough, including Coinbase and Robinhood credentials, dry-run behavior, exact live gates and custom-agent patterns, read [Building Coinbase and Robinhood agents with Omni data](docs/trading-agents.md).
+For a complete research-to-order walkthrough, including Coinbase and Robinhood credentials, dry-run behavior, exact live gates and custom-agent patterns, read [Building Coinbase and Robinhood agents with Omni data](docs/trading-agents.md). For Coinbase Agentic Wallet x402 payment plus the official Robinhood Trading MCP, use the [zero-to-one runbook](docs/agentic-trading-0-to-1.md).
 
 ## Authentication and payment
 
@@ -176,8 +176,8 @@ npm run example:robinhood
 
 Both agents:
 
-- purchase `market-risk` through x402 REST by default, or through Omni MCP when `OMNI_RESEARCH_TRANSPORT=mcp`;
-- require `RUN_PAID_RESEARCH=true` before that single purchase and hard-cap it at `$0.01`;
+- purchase `market-risk` through x402 REST by default, through Omni MCP when `OMNI_RESEARCH_TRANSPORT=mcp`, or purchase Market Risk over REST plus Market Carry over MCP when the transport is `both`;
+- require `RUN_PAID_RESEARCH=true`, hard-cap every call at `$0.01`, and require an exact `$0.013` session declaration for dual-transport mode;
 - apply a deterministic confidence and funding guardrail;
 - cap order notional with `MAX_ORDER_NOTIONAL_USD` and refuse an example ceiling above `$100`;
 - return `HOLD` when the signal is weak or funding is extreme;
@@ -187,7 +187,7 @@ Coinbase always calls the authenticated order-preview endpoint first, including 
 
 These are integration examples, not a profitable strategy or investment advice. Use separate least-privilege keys, wallet spending limits, broker-side limits, and human approval for material orders.
 
-Use the `:demo` commands first: they require no credentials or payment and cannot submit an order. See the [full trading-agent guide](docs/trading-agents.md) for copy-paste environment templates, Coinbase ECDSA key setup and static sandbox notes, Robinhood Ed25519 setup, transport selection, side-effect matrix, extension examples and deployment checklist.
+Use the `:demo` commands first: they require no credentials or payment and cannot submit an order. See the [full trading-agent guide](docs/trading-agents.md) for copy-paste environment templates, Coinbase ECDSA key setup and static sandbox notes, Robinhood Ed25519 setup, transport selection, side-effect matrix, extension examples and deployment checklist. The direct Robinhood Crypto adapter is distinct from Robinhood's OAuth-based Agentic Trading MCP.
 
 ## Verification
 
@@ -213,4 +213,6 @@ npm audit --omit=dev
 - x402 buyer quickstart: https://docs.x402.org/getting-started/quickstart-for-buyers
 - MCP TypeScript client: https://ts.sdk.modelcontextprotocol.io/client
 - Coinbase Advanced Trade: https://docs.cdp.coinbase.com/coinbase-app/advanced-trade-apis/rest-api
+- Coinbase Agentic Wallet MCP: https://docs.cdp.coinbase.com/payments-mcp/quickstart
+- Robinhood Agentic Trading MCP: https://robinhood.com/us/en/support/articles/agentic-trading-overview/
 - Robinhood Crypto Trading API: https://docs.robinhood.com/crypto/trading/

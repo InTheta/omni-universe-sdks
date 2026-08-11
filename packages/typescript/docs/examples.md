@@ -55,9 +55,9 @@ The `:public` and `:free` commands override payment and API-key flags from `.env
 | `npm run example:mcp:free` | Yes | No | No | No | No | Free MCP catalog, then exits |
 | `npm run example:mcp` | Yes | Buyer key only when paid mode is enabled | Only with `RUN_PAID_EXAMPLES=true` | No | No | Free catalog or four paid tools, then exits |
 | `npm run example:coinbase:demo` | No | No | No | Mocked preview | No | Deterministic BUY and preview, then exits |
-| `npm run example:coinbase` | Yes | Buyer wallet and Coinbase key | One capped research call | Authenticated preview | Only with both live gates | One decision, then exits |
+| `npm run example:coinbase` | Yes | Buyer wallet and Coinbase key | One call, or two with `both` | Authenticated preview | Only with both live gates | One decision, then exits |
 | `npm run example:robinhood:demo` | No | No | No | No network | No | Deterministic BUY and local order plan, then exits |
-| `npm run example:robinhood` | Yes | Buyer wallet and Robinhood key | One capped research call | No network in dry-run | Only with both live gates | One decision, then exits |
+| `npm run example:robinhood` | Yes | Buyer wallet and Robinhood key | One call, or two with `both` | No network in dry-run | Only with both live gates | One decision, then exits |
 
 ## API-key AI News
 
@@ -77,6 +77,7 @@ Use a separate buyer wallet with only the funds you intend to spend:
 ```dotenv
 EVM_PRIVATE_KEY=0x...
 X402_MAX_PAYMENT_USD=0.01
+X402_MAX_RESEARCH_SESSION_USD=0.013
 RUN_PAID_EXAMPLES=true
 ```
 
@@ -101,7 +102,7 @@ npm run example:coinbase:demo
 npm run example:robinhood:demo
 ```
 
-The configured agents make one paid `market-risk` request. Coinbase dry-run makes an authenticated preview request but never calls create-order. Robinhood dry-run constructs the exact v2 path and body locally and makes no Robinhood request. Real submission requires `LIVE_TRADING=true` plus the broker-specific `CONFIRM_LIVE_ORDER` value.
+The configured agents make one paid `market-risk` request by default. With `OMNI_RESEARCH_TRANSPORT=both`, they buy Market Risk over x402 REST and Market Carry over native x402 MCP for an exact maximum session spend of `0.013` USDC. Coinbase dry-run makes an authenticated preview request but never calls create-order. Robinhood Crypto dry-run constructs the exact v2 path and body locally and makes no Robinhood request. Real submission requires `LIVE_TRADING=true` plus the broker-specific `CONFIRM_LIVE_ORDER` value. For Coinbase Agentic Wallet and the official Robinhood Trading MCP, follow [agentic trading from zero to one](agentic-trading-0-to-1.md).
 
 ## Hyperliquid testnet agents
 

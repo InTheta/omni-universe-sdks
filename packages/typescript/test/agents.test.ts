@@ -67,6 +67,22 @@ test("agent research requires explicit paid opt-in, a valid buyer key, and a one
     EVM_PRIVATE_KEY: `0x${"1".repeat(64)}`,
     OMNI_RESEARCH_TRANSPORT: "mcp",
   }).transport, "mcp");
+  assert.deepEqual(readAgentResearchConfig({
+    RUN_PAID_RESEARCH: "true",
+    EVM_PRIVATE_KEY: `0x${"1".repeat(64)}`,
+    OMNI_RESEARCH_TRANSPORT: "both",
+  }), {
+    maxPaymentUsd: 0.01,
+    maxSessionPaymentUsd: 0.013,
+    privateKey: `0x${"1".repeat(64)}`,
+    transport: "both",
+  });
+  assert.throws(() => readAgentResearchConfig({
+    RUN_PAID_RESEARCH: "true",
+    EVM_PRIVATE_KEY: `0x${"1".repeat(64)}`,
+    OMNI_RESEARCH_TRANSPORT: "both",
+    X402_MAX_RESEARCH_SESSION_USD: "0.012",
+  }), /requires X402_MAX_RESEARCH_SESSION_USD=0.013/);
 });
 
 test("Coinbase dry-run authenticates only the preview and never creates an order", async () => {

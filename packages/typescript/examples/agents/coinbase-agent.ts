@@ -27,9 +27,15 @@ const coinbase = demo
       maxOrderNotionalUsd: config.maxNotionalUsd,
     });
 
-const { data: risk, payment, transport } = await loadMarketRisk(config.symbol, { demo });
+const { data: risk, payment, supportingEvidence, supportingPayment, transport } = await loadMarketRisk(config.symbol, { demo });
 const decision = decideFromMarketRisk(risk, { maxNotionalUsd: config.maxNotionalUsd });
-console.log({ mode: demo ? "demo" : "configured", transport, payment, decision });
+console.log({
+  mode: demo ? "demo" : "configured",
+  transport,
+  payments: { primary: payment, supporting: supportingPayment },
+  supportingSchema: supportingEvidence?.schema,
+  decision,
+});
 
 if (decision.side === "HOLD") {
   console.log("No order: policy returned HOLD.");
