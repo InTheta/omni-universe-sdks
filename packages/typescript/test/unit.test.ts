@@ -32,6 +32,7 @@ test("MCP paid tool arguments are rejected and normalized before payment", () =>
   assert.deepEqual(validateMcpToolArguments("get_market_catalog"), {});
   assert.deepEqual(validateMcpToolArguments("get_market_carry", { symbol: " BTC " }), { symbol: "BTC" });
   assert.deepEqual(validateMcpToolArguments("get_premarket_roundup", {}), { limit: 1 });
+  assert.deepEqual(validateMcpToolArguments("get_premarket_roundup", { date: "2026-08-11" }), { limit: 1, date: "2026-08-11" });
   assert.deepEqual(validateMcpToolArguments("resolve_market_entities", { mentions: [" bitcoin "] }), {
     mentions: ["bitcoin"],
     venue: "hyperliquid",
@@ -39,6 +40,10 @@ test("MCP paid tool arguments are rejected and normalized before payment", () =>
   assert.throws(
     () => validateMcpToolArguments("get_market_moving_events", { limit: 21 }),
     /limit must be an integer between 1 and 20/,
+  );
+  assert.throws(
+    () => validateMcpToolArguments("get_premarket_roundup", { date: "2026-02-30" }),
+    /valid YYYY-MM-DD date/,
   );
   assert.throws(
     () => validateMcpToolArguments("get_market_risk_context", { symbol: "BTC", extra: true }),
@@ -121,6 +126,7 @@ test("x402 client rejects invalid paid calls before invoking fetch", () => {
   assert.throws(() => client.resolveSymbols([]), /mentions must contain between 1 and 20/);
   assert.throws(() => client.resolveSymbols([" "]), /mentions\[0\] must contain 1 to 100/);
   assert.throws(() => client.premarketRoundup(6), /limit must be an integer between 1 and 5/);
+  assert.throws(() => client.premarketRoundup({ date: "11-08-2026" }), /exact YYYY-MM-DD date/);
   assert.equal(fetchCalls, 0);
 });
 

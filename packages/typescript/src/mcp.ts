@@ -3,7 +3,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { x402Client } from "@x402/core/client";
 import { wrapMCPClientWithPayment, type PaymentRequestedContext, type SettleResponse, type x402MCPClient, type x402MCPToolCallResult } from "@x402/mcp";
 import { OmniContractError } from "./errors.js";
-import type { EntityResolution, MarketCarry, MarketRisk, NewsPulse, PremarketRoundup } from "./types.js";
+import type { EntityResolution, MarketCarry, MarketRisk, NewsPulse, PremarketRoundup, PremarketRoundupQuery } from "./types.js";
 import { createEvmPaymentClient, DEFAULT_MAX_X402_PAYMENT_USD, validatePaymentSettlement } from "./x402.js";
 
 export type OmniMcpToolName =
@@ -135,12 +135,12 @@ export class OmniMcpClient {
     return this.callJsonTool("get_market_carry", { symbol });
   }
 
-  premarketRoundup(limit = 1): Promise<x402MCPToolCallResult> {
-    return this.callTool("get_premarket_roundup", { limit });
+  premarketRoundup(input: number | PremarketRoundupQuery = 1): Promise<x402MCPToolCallResult> {
+    return this.callTool("get_premarket_roundup", premarketArguments(input));
   }
 
-  premarketRoundupData(limit = 1): Promise<OmniMcpDataResult<PremarketRoundup>> {
-    return this.callJsonTool("get_premarket_roundup", { limit });
+  premarketRoundupData(input: number | PremarketRoundupQuery = 1): Promise<OmniMcpDataResult<PremarketRoundup>> {
+    return this.callJsonTool("get_premarket_roundup", premarketArguments(input));
   }
 
   async close(): Promise<void> {
@@ -262,9 +262,24 @@ export function validateMcpToolArguments(
       assertOnlyKeys(name, input, ["symbol"]);
       return { symbol: normalizeString("symbol", input.symbol, 2, 15) };
     case "get_premarket_roundup":
-      assertOnlyKeys(name, input, ["limit"]);
+      assertOnlyKeys(name, input, ["limit", "date"]);
       assertOptionalInteger("limit", input.limit, 1, 5);
-      return { limit: input.limit ?? 1 };
+      if (input.date !== undefined) assertIsoDate("date", input.date);
+      return { limit: input.limit ?? 1, ...(input.date === undefined ? {} : { date: input.date }) };
+  }
+}
+
+function premarketArguments(input: number | PremarketRoundupQuery): Record<string, unknown> {
+  return typeof input === "number" ? { limit: input } : { ...input };
+}
+
+function assertIsoDate(name: string, value: unknown): asserts value is string {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new RangeError(`${name} must be an exact YYYY-MM-DD date`);
+  }
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) {
+    throw new RangeError(`${name} must be a valid YYYY-MM-DD date`);
   }
 }
 

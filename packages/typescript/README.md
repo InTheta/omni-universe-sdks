@@ -138,6 +138,10 @@ const { data, payment } = await paid.marketRisk("BTC", { scope: "current", limit
 
 Paid methods return contract-shaped TypeScript objects. They validate runtime symbols, addresses, limits, filters, timestamps, and entity batches before invoking the payment-aware fetch layer, then verify product service/schema discriminants and require a successful `PAYMENT-RESPONSE` settlement with a transaction and network. Invalid requests cannot trigger avoidable payment attempts, and response or settlement-contract drift fails closed.
 
+`premarketRoundup()` returns the latest published roundup. Pass
+`premarketRoundup({ date: "2026-08-11" })` for an exact publication date, or include
+`limit: 1..5`. The numeric form, such as `premarketRoundup(1)`, remains supported.
+
 Run `npm run example:x402`. It makes only the two free health calls unless `RUN_PAID_EXAMPLES=true` is explicitly set; with that flag it purchases every route once.
 
 ## MCP — every tool
@@ -160,6 +164,7 @@ console.log(await mcp.marketRiskData({ symbol: "BTC" }));
 console.log(await mcp.resolveEntitiesData(["bitcoin"]));
 console.log(await mcp.marketCarryData("BTC"));
 console.log(await mcp.premarketRoundupData(1));
+console.log(await mcp.premarketRoundupData({ date: "2026-08-11" }));
 await mcp.close();
 ```
 

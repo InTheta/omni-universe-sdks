@@ -19,7 +19,7 @@ The prices above are the current maximum list-price sum. The unpaid challenge is
 | Service | Transport | Price | Role |
 | --- | --- | ---: | --- |
 | `resolve_market_entities` | Omni MCP + x402 | 0.001 | Optional normalization of names such as `bitcoin` or `BTC-PERP` |
-| `get_premarket_roundup` | Omni MCP + x402 | 0.005 | Latest published morning thesis, sanitized excerpt, and canonical article URL |
+| `get_premarket_roundup` | Omni MCP + x402 | 0.005 | Latest (default) or exact-date published morning thesis, sanitized excerpt, and canonical article URL |
 | `get_market_moving_events` | Omni MCP + x402 | 0.001 | Fresh catalysts, sentiment, impact, confidence, and affected tickers |
 | `get_market_risk_context` | Omni MCP + x402 | 0.010 | Required mark-anchored liquidation pressure, margin stress, carry, and news gate |
 | `get_market_carry` | Omni MCP + x402 | 0.003 | Dedicated 1h funding and mechanical 8h, 1d, and APR cross-check |
@@ -82,7 +82,7 @@ You are a market-risk analyst. For the user's market question:
 
 1. Call Omni's free get_market_catalog and verify current prices and schemas.
 2. Resolve a non-canonical market name with resolve_market_entities. Stop if it is ambiguous.
-3. In parallel, call get_premarket_roundup(limit=1), get_market_moving_events(symbol=<symbol>, limit=5, event_window_minutes=60), and get_market_risk_context(symbol=<symbol>, scope=current, limit=5).
+3. In parallel, call get_premarket_roundup(limit=1), get_market_moving_events(symbol=<symbol>, limit=5, event_window_minutes=60), and get_market_risk_context(symbol=<symbol>, scope=current, limit=5). For a historical brief, pass `date=YYYY-MM-DD` to the roundup tool.
 4. For deep research, also run get_market_carry plus the HTTP Market Snapshot and Liquidation Map products in parallel.
 5. Validate every schema, freshness object, and settlement receipt. Never treat a 402, timeout, malformed result, missing receipt, or stale required input as neutral evidence.
 6. Produce:
