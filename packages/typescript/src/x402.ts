@@ -14,6 +14,7 @@ import type {
   PaidResult,
   PaymentReceipt,
   PremarketRoundup,
+  PremarketRoundupQuery,
   TraderLeaderboard,
   TraderProfile,
   X402Health,
@@ -255,10 +256,15 @@ export class OmniX402Client {
     });
   }
 
-  premarketRoundup(limit = 1): Promise<PaidResult<PremarketRoundup>> {
-    assertOptionalInteger("limit", limit, 1, 5);
+  premarketRoundup(limit?: number): Promise<PaidResult<PremarketRoundup>>;
+  premarketRoundup(query?: PremarketRoundupQuery): Promise<PaidResult<PremarketRoundup>>;
+  premarketRoundup(input: number | PremarketRoundupQuery = 1): Promise<PaidResult<PremarketRoundup>> {
+    const query = typeof input === "number" ? { limit: input } : { ...input };
+    query.limit ??= 1;
+    assertOptionalInteger("limit", query.limit, 1, 5);
+    if (query.date !== undefined) assertIsoDate("date", query.date);
     return this.request("GET", "/api/x402/v1/research/premarket", {
-      query: { limit },
+      query,
       contract: {
         service: "omni.premarket_roundup",
         schema: "premarket_roundup.v1",
@@ -272,6 +278,16 @@ const x402Symbols: readonly X402Symbol[] = ["BTC", "ETH", "SOL", "HYPE"];
 
 function assertSymbol(symbol: string): asserts symbol is X402Symbol {
   assertOneOf("symbol", symbol, x402Symbols);
+}
+
+function assertIsoDate(name: string, value: unknown): asserts value is string {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new RangeError(`${name} must be an exact YYYY-MM-DD date`);
+  }
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) {
+    throw new RangeError(`${name} must be a valid YYYY-MM-DD date`);
+  }
 }
 
 function validateNewsQuery(query: X402NewsQuery): void {

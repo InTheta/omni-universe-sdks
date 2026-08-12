@@ -40,6 +40,7 @@ const calls = [
   ["entity resolution", () => client.resolveSymbols(["bitcoin", "BTC-PERP"])],
   ["market carry", () => client.marketCarry("BTC")],
   ["pre-market roundup", () => client.premarketRoundup(1)],
+  ["dated pre-market roundup", () => client.premarketRoundup({ date: "2026-08-11" })],
 ] as const;
 
 for (const [name, call] of calls) {

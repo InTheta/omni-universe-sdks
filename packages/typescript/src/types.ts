@@ -431,6 +431,13 @@ export interface PublishedPremarketRoundup {
   word_count: number | null;
 }
 
+export interface PremarketRoundupQuery {
+  /** Number of matching roundups to return (1-5). */
+  limit?: number;
+  /** Exact publication date in YYYY-MM-DD. Omit for the latest published roundup. */
+  date?: string;
+}
+
 export interface PremarketRoundup {
   service: "omni.premarket_roundup";
   product_version: "v1";
@@ -444,6 +451,8 @@ export interface PremarketRoundup {
   };
   items: PublishedPremarketRoundup[];
   usage: {
+    selection_mode: "latest" | "date";
+    requested_date: string | null;
     item_count: number;
     item_limit: number;
     examined_count: number;
