@@ -47,6 +47,8 @@ jobs:
           cache: npm
           cache-dependency-path: packages/typescript/package-lock.json
       - run: npm ci
+      # Keep full-tree critical audit separate from the runtime-only verify audit.
+      - run: npm audit --audit-level=critical
       - run: npm run verify
 
   live-contract:
@@ -81,6 +83,7 @@ jobs:
           cache: npm
           cache-dependency-path: examples/testnet-agents/package-lock.json
       - run: npm ci
+      - run: npm audit --audit-level=critical
       - run: npm run verify:live
 
   testnet-order-lifecycle:
