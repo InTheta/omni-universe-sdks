@@ -1,6 +1,6 @@
 # Guarded Hyperliquid testnet execution
 
-`GuardedTestnetExecutor` is included in the coordinated v0.8.1 release. Install its tagged archive or build the matching source revision; publication availability is described in the [release notes](releases/0.8.1.md). Historical v0.8.0 does **not** export this API.
+`GuardedTestnetExecutor` is included in v0.8.3. Use [installed SDK quickstarts](installed-quickstarts.md) for compiled JavaScript examples with no development dependencies, or build the matching tagged source. Historical v0.8.0 does **not** export this API.
 
 Migration: v0.8.1 requires Node >=22.12; the execution dependency raises the previous Node >=20.19 minimum. Historical v0.8.0 consumers retain their published runtime contract. Upgrade Node before upgrading the SDK.
 
@@ -13,7 +13,7 @@ npm run build
 npm pack
 ```
 
-To test the actual package boundary, create a clean directory, `npm init -y`, and `npm install /absolute/path/omni-terminal-sdk-0.8.2.tgz`. Import exclusively from `@omni-terminal/sdk`. Its execution client uses the pinned public `@nktkas/hyperliquid` SDK. Neither client sends private keys to Omni or MCP servers; a local MCP adapter must remain under the signer's control.
+To test the actual package boundary, create a clean directory, `npm init -y`, and `npm install /absolute/path/omni-terminal-sdk-0.8.3.tgz`. Import exclusively from `@omni-terminal/sdk`. Its execution client uses the pinned public `@nktkas/hyperliquid` SDK. Neither client sends private keys to Omni or MCP servers; a local MCP adapter must remain under the signer's control.
 
 For the included runner set the **exact** testnet account and validator perpetual symbol:
 
@@ -22,8 +22,10 @@ export HL_TESTNET_ACCOUNT_ADDRESS=0xYOUR_TESTNET_OWNER_ADDRESS
 export TESTNET_SYMBOL=BTC
 export TESTNET_MAX_NOTIONAL_USD=15
 export TESTNET_BUILDER_FEE_TENTHS_BPS=25
-npm run example:guarded-execution
+npm run example:guarded:preview -- --probe-disabled-permission
 ```
+
+The preview flag overrides enabled trading in the process environment and never constructs a signer.
 
 The default run uses free real testnet book, metadata, clearinghouse, and builder-approval reads. `account().margin` reports the exact instrument margin mode/leverage, venue initial margin, cross-account maintenance margin and withdrawable collateral in USD. Instrument maintenance margin is `null` because this endpoint does not supply it separately; cross-account MM must not be presented as isolated-instrument MM. Missing or invalid collateral fails closed before submission. It submits nothing and costs no USDC. This is integration testing, not an executed order lifecycle. There is no BTC or account fallback. Missing instruments and stale books fail explicitly.
 
@@ -46,7 +48,7 @@ Every write has a client order ID and a journal persisted before submission. If 
 
 Reconciliation returns authoritative order status, order-filtered fills, fee fields and account exposure. A request containing a builder field proves only request construction. Fill `builderFee` fields alone do not identify the credited builder. Verify the venue's builder export or other authoritative builder accounting before claiming attribution. An unfilled resting order cannot establish settled builder attribution.
 
-Run deterministic rejection/stale data/insufficient collateral/disconnect/unknown-outcome and fill/close fixtures with:
+The installed archive provides an unsigned deterministic lifecycle runner: `node node_modules/@omni-terminal/sdk/dist-examples/agents/lifecycle-recovery.js`. The deeper guarded-executor regression command below is **source-only**: clone the matching tagged repository and run `npm ci` in `packages/typescript` first; archive installations omit `test/`. Run rejection/stale data/insufficient collateral/disconnect/unknown-outcome and fill/close fixtures with:
 
 ```sh
 node --import tsx --test test/guarded-testnet.test.ts

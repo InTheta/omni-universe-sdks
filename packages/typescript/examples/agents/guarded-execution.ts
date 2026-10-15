@@ -5,7 +5,10 @@ import { privateKeyToAccount } from "viem/accounts";
 import { runGuardedLifecycle } from "./guarded-lifecycle.js";
 
 // The operator supplies a dedicated testnet runtime environment.
-const enabled = process.env.RUN_TESTNET_ORDERS === "true";
+const previewOnly = process.argv.slice(2).includes("--preview-only");
+const permissionProbe = process.argv.slice(2).includes("--probe-disabled-permission");
+if (permissionProbe && !previewOnly) throw new Error("Disabled-permission probe requires --preview-only");
+const enabled = !previewOnly && process.env.RUN_TESTNET_ORDERS === "true";
 if (!process.env.HL_TESTNET_ACCOUNT_ADDRESS || !process.env.TESTNET_SYMBOL) throw new Error("Set exact HL_TESTNET_ACCOUNT_ADDRESS and TESTNET_SYMBOL");
 if (enabled && process.env.CONFIRM_TESTNET_ORDER !== "HYPERLIQUID_TESTNET_ONLY") throw new Error("Explicit testnet confirmation required");
 const directory = resolve(process.env.TESTNET_JOURNAL_DIRECTORY ?? "./testnet-journals");
@@ -32,7 +35,17 @@ const executor = new GuardedTestnetExecutor({
 });
 const plan = await executor.preview("BUY", Number(process.env.TESTNET_MAX_NOTIONAL_USD ?? 15), { kind: process.env.TESTNET_ALLOW_IOC === "true" ? "ioc" : "passive" });
 const account = await executor.account();
-if (!enabled) console.log(JSON.stringify({ mode: "live-read-only", plan, account, costUsdc: 0 }));
+if (!enabled) {
+  let permission: { code: string; venueWriteAttempted: false } | undefined;
+  if (permissionProbe) {
+    try { await executor.submit(plan); throw new Error("Disabled executor unexpectedly accepted submission"); }
+    catch (error) {
+      if (!(error instanceof Error) || !error.message.startsWith("TESTNET_EXECUTION_DISABLED:")) throw error;
+      permission = { code: "TESTNET_EXECUTION_DISABLED", venueWriteAttempted: false };
+    }
+  }
+  console.log(JSON.stringify({ mode: "live-read-only", plan, account, permission, costUsdc: 0 }));
+}
 else {
   const lock = join(directory, ".execution-lock");
   await writeFile(lock, "One process only. If interrupted, reconcile every journal before removing this lock.\n", { flag: "wx", mode: 0o600 });

@@ -1,13 +1,13 @@
 # Research and payment recovery agents
 
-These examples target the coordinated v0.8.1 SDK release. Install its tagged archive once published or build the matching source as described in the [release notes](releases/0.8.1.md). Historical v0.8.0 does not contain these new APIs.
+For v0.8.3 installed-package commands requiring no development dependencies, use [installed SDK quickstarts](installed-quickstarts.md). The source-checkout commands below require `npm ci && npm run build` in `packages/typescript`. Historical v0.8.0 does not contain these APIs.
 
 ## Free real research agent
 
 Prerequisites: Node >=22.12, install dependencies with `npm ci` in `packages/typescript`, then `npm run build`. From that directory:
 
 ```sh
-RESEARCH_SYMBOL=BTC node --import tsx examples/agents/research-readonly.ts
+RESEARCH_SYMBOL=BTC node dist-examples/agents/research-readonly.js --free-only
 ```
 
 This uses only public SDK imports. It resolves the exact active Hyperliquid perpetual, checks book identity/time, connects the actual Omni MCP server, reads its free structured catalog, and inspects the exact HTTP x402 research challenge without signing. The structured output reports both networks, token, receiver, atomic price, market metadata and bid/ask. Account scope is `not_requested` unless an exact public `RESEARCH_ACCOUNT=0x...` is supplied. There is no personal-account or alternate-instrument fallback. Account reads do not grant trading rights.
@@ -21,15 +21,23 @@ Do not execute this until the human approves **one 0.010 test-USDC Market Risk r
 ```sh
 RESEARCH_SYMBOL=BTC RUN_PAID_RESEARCH=true \
 CONFIRM_RESEARCH_TESTNET_BUDGET='0.010 USDC ON BASE SEPOLIA' \
-node --env-file=.env --import tsx examples/agents/research-readonly.ts
+node --env-file=.env dist-examples/agents/research-readonly.js
 ```
 
 The protected local `.env` supplies `EVM_PRIVATE_KEY`; never commit or print it. Direct EVM signing stays in the caller process. A separately hosted ACM payer can instead enforce custody/policy, but x402 buying does not grant trading permission. No API/MCP server needs this private key. The one-request authorization and aggregate ceiling are both 0.010. The receiver defaults to Omni and the only allowed network is Base Sepolia. The exact symbol and URL remain fixed by code, not retrieved headlines. Seller settlement metadata is validated; independently reconcile its transaction on the correct chain for authoritative proof.
 
-## Deterministic recovery runner
+## Deterministic recovery runners
+
+The unsigned lifecycle runner is included in the archive:
 
 ```sh
-node --import tsx examples/agents/payment-recovery.ts
+node dist-examples/agents/lifecycle-recovery.js
+```
+
+The payment-policy fixture below creates and discards a local signature using a public deterministic fixture key; it makes no remote payment. Its regression test command is **source-only** (`test/` is omitted from the archive):
+
+```sh
+node dist-examples/agents/payment-recovery.js
 node --import tsx --test test/x402-hardening.test.ts test/bundle-budget.test.ts
 ```
 

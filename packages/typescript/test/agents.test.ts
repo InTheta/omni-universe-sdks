@@ -17,7 +17,7 @@ test("public example commands load an optional .env file on the supported Node f
   for (const [name, command] of exampleCommands) {
     assert.match(
       command,
-      /^node --env-file-if-exists=\.env --import tsx /,
+      /^node --env-file-if-exists=\.env dist-examples\/.*\.js/,
       `${name} must load .env without requiring it`,
     );
   }

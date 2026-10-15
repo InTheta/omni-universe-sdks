@@ -182,21 +182,29 @@ export class OmniX402Client {
     } catch (error) {
       throw redactedPaymentError(error);
     }
-    const data = await parseResponse<T>(response);
-    if (options.contract) validateProductContract(path, data, options.contract);
-    let payment: PaymentReceipt | null = null;
-    if (response.headers.has("payment-response")) {
-      try {
-        payment = this.httpPaymentClient.getPaymentSettleResponse((name) => response.headers.get(name)) as PaymentReceipt;
-      } catch (error) {
-        throw new OmniContractError(`Invalid PAYMENT-RESPONSE for ${path}`, path, { cause: String(error) });
+    try {
+      const data = await parseResponse<T>(response);
+      if (options.contract) validateProductContract(path, data, options.contract);
+      let payment: PaymentReceipt | null = null;
+      if (response.headers.has("payment-response")) {
+        try {
+          payment = this.httpPaymentClient.getPaymentSettleResponse((name) => response.headers.get(name)) as PaymentReceipt;
+        } catch (error) {
+          throw new OmniContractError(`Invalid PAYMENT-RESPONSE for ${path}`, path, { cause: String(error) });
+        }
       }
+      if (options.contract?.schema !== undefined && !payment) {
+        throw new OmniContractError(`Missing PAYMENT-RESPONSE for paid route ${path}`, path, data);
+      }
+      if (options.contract?.schema !== undefined) validatePaymentSettlement(path, payment);
+      return { data, payment, requestId: response.headers.get("x-request-id") };
+    } catch (error) {
+      if (transport === this.fetcher) {
+        cancelPaidResponseBody(response);
+        throw unconfirmedPaidResponse(error);
+      }
+      throw error;
     }
-    if (options.contract?.schema !== undefined && !payment) {
-      throw new OmniContractError(`Missing PAYMENT-RESPONSE for paid route ${path}`, path, data);
-    }
-    if (options.contract?.schema !== undefined) validatePaymentSettlement(path, payment);
-    return { data, payment, requestId: response.headers.get("x-request-id") };
   }
 
   /** Read-only challenge inspection: never creates a payment or signs, even when a payer is configured. */
@@ -415,6 +423,7 @@ export class OmniX402Client {
       return { data: { contentType: "image/png", bytes, byteLength }, payment, requestId: response.headers.get("x-request-id") };
     } catch (error) {
       if (response) cancelPaidResponseBody(response);
+      if (response) throw unconfirmedPaidResponse(error);
       if (error instanceof OmniContractError || error instanceof OmniApiError) throw error;
       throw redactedPaymentError(error);
     } finally { clearTimeout(timer); }
@@ -559,6 +568,20 @@ function redactedPaymentError(error: unknown): Error {
     : message.includes("Payment authorization limit reached") ? "PAYMENT_AUTHORIZATION_LIMIT" : "PAYMENT_OUTCOME_UNKNOWN";
   const kind = error instanceof Error && (error.name === "AbortError" || error.name === "TimeoutError") ? error.name : undefined;
   return new OmniPaymentError(code, kind);
+}
+
+
+/** Keep established typed errors while making a failed paid response unsafe to re-buy. */
+function unconfirmedPaidResponse(error: unknown): Error {
+  const failure = error instanceof OmniContractError || error instanceof OmniApiError
+    ? error : redactedPaymentError(error);
+  // A response body/contract failure can happen after settlement, or after its receipt
+  // was dropped. These flags are conservative recovery metadata, never payment proof.
+  return Object.defineProperties(failure, {
+    requiresReconciliation: { value: true, enumerable: true, writable: false, configurable: false },
+    retryable: { value: false, enumerable: true, writable: false, configurable: false },
+    paymentOutcome: { value: "unconfirmed", enumerable: true, writable: false, configurable: false },
+  });
 }
 
 
