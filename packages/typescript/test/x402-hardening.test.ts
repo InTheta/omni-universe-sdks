@@ -88,3 +88,12 @@ test("challenge inspection rejects resource substitution and MCP rejects invalid
   await assert.rejects(http.inspectPayment("GET", "/api/x402/v1/news/ETH"), /version\/resource/);
   for (const timeoutMs of [NaN, 0, -1, Infinity]) assert.throws(() => new OmniMcpClient({ timeoutMs }), RangeError);
 });
+
+test("paid HTTP retry cannot sign a substituted challenge resource", async () => {
+  let authorizations = 0;
+  const payer = createEvmPaymentClient(fixtureKey).onBeforePaymentCreation(async () => { authorizations++; });
+  const http = new OmniX402Client({ paymentClient: payer, fetch: async () =>
+    Response.json({}, { status: 402, headers: { "payment-required": encodePaymentRequiredHeader(challenge()) } }) });
+  await assert.rejects(http.marketCarry("BTC"), /different resource/);
+  assert.equal(authorizations, 0);
+});
