@@ -54,7 +54,7 @@ The `:public` and `:free` commands override payment and API-key flags from `.env
 | `npm run example:x402` | Yes | Buyer key only when paid mode is enabled | Only with `RUN_PAID_EXAMPLES=true` | No | No | Free health or all ten paid JSON products, then exits |
 | `npm run example:mcp:free` | Yes | No | No | No | No | Free MCP catalog, then exits |
 | `npm run example:mcp` | Yes | Buyer key only when paid mode is enabled | Only with `RUN_PAID_EXAMPLES=true` | No | No | Free catalog or five paid tools, then exits |
-| `npm run example:ask-omni:demo` | No | No | No | No | No | Prints the current 0.120-0.144 USDC bundle plan and deterministic evidence; paid mode exceeds the unchanged example ceiling |
+| `npm run example:ask-omni:demo` | No | No | No | No | No | Prints the current 0.120-0.144 USDC plan; paid mode preflights the preserved 0.030 total/0.010 per-call defaults and rejects before work |
 | `npm run example:ask-omni` | Yes | Dedicated buyer key | Only with `RUN_PAID_ASK_OMNI_BUNDLE=yes` | No | No | Executes one bounded brief/deep/visual research bundle |
 | `npm run example:coinbase:demo` | No | No | No | Mocked preview | No | Deterministic BUY and preview, then exits |
 | `npm run example:coinbase` | Yes | Buyer wallet and Coinbase key | One call, or two with `both` | Authenticated preview | Only with both live gates | One decision, then exits |

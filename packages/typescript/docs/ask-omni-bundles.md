@@ -2,7 +2,7 @@
 
 An Ask Omni bundle is an agent recipe over separately settled Omni x402 products. It is not one opaque paid endpoint: the agent sees each resource, price, schema, freshness field, and settlement receipt before it synthesizes an answer.
 
-This follows the bundle pattern used by Agentic Market: quote a bounded run cost, name every service, run independent calls in parallel, make enrichments optional, and define a no-retry fallback.
+Each recipe names every service and price. The SDK's guarded runner executes items sequentially, reserves the entire known total before work, and never retries a paid item automatically.
 
 ## Bundle menu
 
@@ -32,9 +32,9 @@ The prices above are the current maximum list-price sum. The unpaid challenge is
 ## Workflow
 
 1. Call the free `get_market_catalog` tool and verify the route inventory, prices, networks, and schemas.
-2. If the user supplied a name rather than an allowlisted symbol, call `resolve_market_entities` first. Stop on ambiguity.
-3. Run the published roundup, moving-events, and Market Risk calls in parallel.
-4. For deep research, run Carry, Market Snapshot, and Liquidation Map in parallel. They are optional enrichments.
+2. Preflight every item and the complete known charge against the caller's explicit total/per-call limits before resolution or any other paid work. The default example budget is 0.030 USDC total, 0.010 per call; it rejects all current bundles.
+3. If the user supplied a name rather than an allowlisted symbol, resolve first. Stop on ambiguity. Then request the roundup, moving events and Market Risk.
+4. Deep research adds Carry, Market Snapshot and Liquidation Map. By default any failure stops remaining items. Only `{ allowPartial: true }` permits continuing after an optional `omit_without_retry` item fails; required failures still stop.
 5. For the visual tier, request the PNG only after the JSON evidence passes validation.
 6. Require the expected service/schema, acceptable freshness, a successful settlement receipt, and canonical article URLs.
 7. Synthesize agreements and contradictions. Cite the published roundup and distinguish editorial thesis from live observations.
@@ -53,18 +53,57 @@ npm run example:ask-omni:demo
 
 The demo uses deterministic placeholders, performs no external request, and makes no payment.
 
-The committed bundle example is currently qualified for the no-spend demo path
-only. Its existing maximum aggregate ceiling is 0.050 USDC and its per-call cap
-is 0.010 USDC. Every complete bundle now exceeds that ceiling, and the roundup
-alone exceeds the per-call cap. Paid mode therefore rejects the corrected plan
-before making a paid request. Do not follow old 0.030-USDC funded-run instructions
-or raise caps merely to make a demo pass.
+The example is qualified with hermetic tests and the no-spend demo, not a funded
+run. Its existing default aggregate budget is 0.030 USDC, not 0.050 (the old
+example's upper validation bound). Its default per-call cap remains 0.010 USDC.
+Neither is silently raised. Paid opt-in alone is insufficient. A caller may
+explicitly configure `X402_BUNDLE_MAX_USD` and `X402_MAX_PAYMENT_USD` after reviewing
+prices; the selected plan still must fit both before any connection/payment.
 
 To integrate a real bundle, first inspect the free catalog, select the exact
 products, and obtain an explicit aggregate and per-call budget. Use the single
 Market Risk example in the README for a smaller deliberately approved request.
-Any separately approved bundle implementation must retain receipt validation,
-no-retry reconciliation and broker separation. This example never calls a broker.
+The example retains settlement/schema validation, no-retry reconciliation and
+broker separation. Each payment client is restricted to its item ceiling and
+one authorization; even a library recovery path cannot create a second payment
+payload. A changed challenge above an item ceiling fails closed.
+
+### Reservation and failure contract
+
+`BundleBudget.execute(operationId, plan, adapter, options)` synchronously reserves
+the sum of all item ceilings before calling the adapter. Over-budget errors are
+`BundleBudgetError` with code `BUNDLE_BUDGET_EXCEEDED`, `requiredAtomic`,
+`availableAtomic`, `boundary` (`bundle` or `per_call`) and optional `stepId`.
+Amounts are integer micro-USDC. No items are omitted to make a plan affordable.
+
+Share one budget instance across concurrent requests. Reuse the same operation
+ID and unchanged plan for retries; the original promise/result is returned with
+no new work. A different plan with the same ID is rejected. This is in-memory
+only: restarting, using another instance/process or a new ID is NOT a safe retry.
+Use a durable caller ledger and independently reconcile ambiguous settlements
+before any new authorization. No refund or financial atomicity is promised.
+
+Adapters must bound signing to `step.priceAtomic` and at most one authorization.
+Return `chargedAtomic` only when the actual charge is proven. Unknown amounts or
+exceptions retain the full attempted item ceiling as `uncertainAtomic`; they are
+not called actual charges and are never made available again in this instance.
+Unattempted item reservations and proven unused amounts are released. The
+example's receipts do not consistently expose exact amounts, so it retains the
+ceiling even after a successful response. Partial results include item statuses,
+proven charges, uncertain authorizations and unstarted items. Defaults stop on
+failure; opt-in partial mode continues only after optional failures.
+
+```ts
+import { BundleBudget, createAskOmniBundlePlan } from "@omni-terminal/sdk";
+
+const budget = new BundleBudget({ budgetUsd: 0.030, maxPaymentUsd: 0.010 });
+const plan = createAskOmniBundlePlan({ symbol: "BTC", tier: "brief" });
+// This throws before adapter execution: required 120000, available 30000.
+// Use an adapter with step-specific/one-shot payment policies in a real integration.
+await budget.execute("persisted-research-intent-id", plan, async () => {
+  throw new Error("Not reached at these deliberately insufficient defaults");
+});
+```
 
 Base mainnet is available only when `OMNI_X402_NETWORK=eip155:8453` is set explicitly and the dedicated wallet is funded. Start on Sepolia. Never use a broker, treasury, receiver, or general-purpose wallet as the payer.
 
@@ -80,8 +119,8 @@ You are a market-risk analyst. For the user's market question:
 
 1. Call Omni's free get_market_catalog and verify current prices and schemas.
 2. Resolve a non-canonical market name with resolve_market_entities. Stop if it is ambiguous.
-3. In parallel, call get_premarket_roundup(limit=1), get_market_moving_events(symbol=<symbol>, limit=5, event_window_minutes=60), and get_market_risk_context(symbol=<symbol>, scope=current, limit=5). For a historical brief, pass `date=YYYY-MM-DD` to the roundup tool.
-4. For deep research, also run get_market_carry plus the HTTP Market Snapshot and Liquidation Map products in parallel.
+3. Preflight the complete cost and every per-call ceiling, then call get_premarket_roundup(limit=1), get_market_moving_events(symbol=<symbol>, limit=5, event_window_minutes=60), and get_market_risk_context(symbol=<symbol>, scope=current, limit=5). For a historical brief, pass `date=YYYY-MM-DD` to the roundup tool.
+4. For deep research, add get_market_carry plus the HTTP Market Snapshot and Liquidation Map. Continue after optional failures only if partial mode was explicitly selected.
 5. Validate every schema, freshness object, and settlement receipt. Never treat a 402, timeout, malformed result, missing receipt, or stale required input as neutral evidence.
 6. Produce:
    - Executive view: 2-3 sentences answering the question.
