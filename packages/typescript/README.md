@@ -293,3 +293,5 @@ An error is not proof that a payment was never settled: reconcile an uncertain
 payment before approving another attempt. This guarantee applies to Omni's
 wrapper; direct use of the raw `@modelcontextprotocol/sdk` client requires its
 own error redaction and must not log arbitrary exception data.
+
+Source-only recent testnet accounting: [bounded fill, fee and funding report](docs/recent-reconciliation.md), with explicit retention gaps and no signing or paid usage.
