@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { createServer } from "node:http";
+import { gzipSync } from "node:zlib";
 import { x402Client } from "@x402/core/client";
 import { encodePaymentRequiredHeader, encodePaymentResponseHeader } from "@x402/core/http";
 import { OmniX402Client, OmniContractError, OmniApiError, OmniPaymentError, createEvmPaymentClient, OMNI_USDC_ASSETS, OMNI_X402_RECEIVER } from "../src/index.js";
@@ -73,4 +75,54 @@ test("PNG transport uses ordinary exact-resource payment binding and shared aggr
  await assert.rejects(client.liquidationLevelsScreenshot("BTC"),OmniPaymentError);assert.equal(calls,3);
  const mismatch=new OmniX402Client({paymentClient:payer,fetch:async()=>new Response(null,{status:402,headers:{"payment-required":encodePaymentRequiredHeader({x402Version:2,resource:{url:"https://omniterminal.app"+path+"?different=true"},accepts:[]})}})});
  await assert.rejects(mismatch.liquidationLevelsScreenshot("BTC"),OmniContractError);
+});
+
+async function boundedFailure(promise:Promise<unknown>):Promise<unknown>{
+ let timer:ReturnType<typeof setTimeout>;
+ try{return await Promise.race([promise.then(()=>"unexpected_success",error=>error),new Promise(resolve=>{timer=setTimeout(()=>resolve("still_pending"),500);})]);}
+ finally{clearTimeout(timer!);}
+}
+
+test("PNG deadline bounds stalled body reads and cleanup even when custom fetch ignores abort",async()=>{
+ let cancelled=0;
+ const body=new ReadableStream<Uint8Array>({cancel(){cancelled++;return new Promise(()=>{});}});
+ const client=new OmniX402Client({paymentClient:new x402Client(),screenshotTimeoutMs:10,fetch:async()=>response(body)});
+ const error=await boundedFailure(client.liquidationLevelsScreenshot("BTC"));
+ assert.ok(error instanceof OmniPaymentError);assert.equal(error.name,"TimeoutError");assert.equal(cancelled,1);
+});
+
+test("PNG oversize and header rejection never await an adapter cancellation promise",async()=>{
+ for(const badHeader of [false,true]){
+  let cancelled=0;
+  const body=new ReadableStream<Uint8Array>({start(c){if(!badHeader)c.enqueue(png);},cancel(){cancelled++;return new Promise(()=>{});}});
+  const client=new OmniX402Client({paymentClient:new x402Client(),maxScreenshotBytes:8,screenshotTimeoutMs:50,fetch:async()=>response(body,badHeader?{"content-type":"text/plain"}:{})});
+  assert.ok(await boundedFailure(client.liquidationLevelsScreenshot("BTC")) instanceof OmniContractError);assert.equal(cancelled,1);
+ }
+});
+
+test("a late challenge from an abort-ignoring adapter cannot create a payment after caller timeout",async()=>{
+ let finish!:(response:Response)=>void;
+ let authorizations=0;
+ const payer=createEvmPaymentClient(`0x${"11".repeat(32)}`,{allowedNetworks:["eip155:84532"],maxPaymentAuthorizations:1});
+ payer.onBeforePaymentCreation(async()=>{authorizations++;});
+ const client=new OmniX402Client({paymentClient:payer,screenshotTimeoutMs:10,fetch:async()=>new Promise(resolve=>{finish=resolve;})});
+ const error=await boundedFailure(client.liquidationLevelsScreenshot("BTC"));
+ assert.ok(error instanceof OmniPaymentError);assert.equal(error.name,"TimeoutError");
+ finish(new Response(null,{status:402,headers:{"payment-required":encodePaymentRequiredHeader({x402Version:2,resource:{url:"https://omniterminal.app/api/x402/v1/screenshots/liquidation-levels/BTC"},accepts:[{scheme:"exact",network:"eip155:84532",asset:OMNI_USDC_ASSETS["eip155:84532"][0],amount:"10000",payTo:OMNI_X402_RECEIVER,maxTimeoutSeconds:60,extra:{name:"USDC",version:"2"}}]})}}));
+ await new Promise(resolve=>setTimeout(resolve,20));assert.equal(authorizations,0);
+});
+
+test("native fetch gzip PNG uses the decoded byte cap, not encoded Content-Length",async()=>{
+ const compressed=gzipSync(png);
+ assert.ok(compressed.length>png.length,"fixture must expose a wire length larger than decoded PNG");
+ const server=createServer((_req,res)=>{res.writeHead(200,{...headers(),"content-encoding":"gzip","content-length":String(compressed.length)});res.end(compressed);});
+ await new Promise<void>(resolve=>server.listen(0,"127.0.0.1",resolve));
+ try{
+  const address=server.address();assert.ok(address&&typeof address!=="string");
+  const baseUrl=`http://127.0.0.1:${address.port}`;
+  const client=new OmniX402Client({baseUrl,paymentClient:new x402Client(),maxScreenshotBytes:png.length});
+  const result=await client.liquidationLevelsScreenshot("BTC");assert.deepEqual(result.data.bytes,png);assert.equal(result.data.byteLength,png.length);
+  const small=new OmniX402Client({baseUrl,paymentClient:new x402Client(),maxScreenshotBytes:8});
+  await assert.rejects(small.liquidationLevelsScreenshot("BTC"),/byte budget/);
+ }finally{server.closeAllConnections();await new Promise<void>((resolve,reject)=>server.close(error=>error?reject(error):resolve()));}
 });

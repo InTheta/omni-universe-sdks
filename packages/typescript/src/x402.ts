@@ -139,7 +139,13 @@ export class OmniX402Client {
     this.httpPaymentClient = new x402HTTPClient(options.paymentClient);
     this.rawFetcher = options.fetch ?? globalThis.fetch;
     this.fetcher = wrapFetchWithPayment(async (input, init) => {
+      const signal = init?.signal ?? (input instanceof Request ? input.signal : undefined);
+      signal?.throwIfAborted();
       const response = await this.rawFetcher(input, init);
+      if (signal?.aborted) {
+        cancelPaidResponseBody(response);
+        signal.throwIfAborted();
+      }
       if (response.status === 402 && response.headers.has("payment-required")) {
         const requestedUrl = input instanceof Request ? input.url : String(input);
         const required = decodePaymentRequiredHeader(response.headers.get("payment-required")!);
@@ -358,28 +364,28 @@ export class OmniX402Client {
 
   /** Purchase a bounded PNG. The returned receipt is seller metadata; reconcile it on-chain separately. */
   private async requestScreenshot(path: string, query: Record<string, QueryValue>): Promise<PaidResult<ScreenshotPng>> {
-    let response: Response;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(new DOMException("Screenshot request timed out", "TimeoutError")), this.screenshotTimeoutMs);
+    let response: Response | undefined;
     try {
-      response = await this.fetcher(buildUrl(this.baseUrl, path, query), {
-        method: "GET", redirect: "error", headers: { accept: "image/png" },
-        signal: mergeSignals(this.screenshotTimeoutMs),
-      });
-    } catch (error) {
-      throw redactedPaymentError(error);
-    }
-    try {
+      response = await waitForScreenshot(this.fetcher(buildUrl(this.baseUrl, path, query), {
+        method: "GET", redirect: "error", headers: { accept: "image/png" }, signal: controller.signal,
+      }), controller.signal);
       if (!response.ok) throw new OmniApiError("Omni screenshot request failed", response.status, response, undefined);
       if (response.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase() !== "image/png") {
         throw new OmniContractError("Expected image/png screenshot", path, undefined);
       }
       let payment: PaymentReceipt | null = null;
       try {
-        payment = this.httpPaymentClient.getPaymentSettleResponse((name) => response.headers.get(name)) as PaymentReceipt;
+        payment = this.httpPaymentClient.getPaymentSettleResponse((name) => response!.headers.get(name)) as PaymentReceipt;
       } catch {
         throw new OmniContractError("Invalid screenshot PAYMENT-RESPONSE", path, undefined);
       }
       validatePaymentSettlement(path, payment);
-      const declaredLength = response.headers.get("content-length");
+      // Fetch decodes gzip/br, but Content-Length still describes wire bytes.
+      // Compare declared lengths only when they describe the decoded PNG body.
+      const encoding = response.headers.get("content-encoding")?.trim().toLowerCase();
+      const declaredLength = !encoding || encoding === "identity" ? response.headers.get("content-length") : null;
       if (declaredLength !== null && (!/^\d+$/.test(declaredLength) || Number(declaredLength) > this.maxScreenshotBytes)) {
         throw new OmniContractError("Screenshot exceeds client byte budget", path, undefined);
       }
@@ -389,36 +395,29 @@ export class OmniX402Client {
       let byteLength = 0;
       try {
         while (true) {
-          const { value, done } = await reader.read();
+          const { value, done } = await waitForScreenshot(reader.read(), controller.signal);
           if (done) break;
           byteLength += value.byteLength;
-          if (byteLength > this.maxScreenshotBytes) {
-            await reader.cancel();
-            throw new OmniContractError("Screenshot exceeds client byte budget", path, undefined);
-          }
+          if (byteLength > this.maxScreenshotBytes) throw new OmniContractError("Screenshot exceeds client byte budget", path, undefined);
           chunks.push(value);
         }
       } catch (error) {
-        if (error instanceof OmniContractError) throw error;
-        throw new OmniPaymentError("PAYMENT_OUTCOME_UNKNOWN");
-      } finally {
-        reader.releaseLock();
-      }
-      if (declaredLength !== null && byteLength !== Number(declaredLength)) {
-        throw new OmniContractError("Screenshot length mismatch", path, undefined);
-      }
+        // Adapter cancellation may never resolve. Close pending reads without waiting.
+        void reader.cancel().catch(() => undefined);
+        throw error;
+      } finally { reader.releaseLock(); }
+      if (declaredLength !== null && byteLength !== Number(declaredLength)) throw new OmniContractError("Screenshot length mismatch", path, undefined);
       const bytes = new Uint8Array(byteLength);
       let offset = 0;
       for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
       const signature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
-      if (!signature.every((value, index) => bytes[index] === value)) {
-        throw new OmniContractError("Invalid PNG signature", path, undefined);
-      }
+      if (!signature.every((value, index) => bytes[index] === value)) throw new OmniContractError("Invalid PNG signature", path, undefined);
       return { data: { contentType: "image/png", bytes, byteLength }, payment, requestId: response.headers.get("x-request-id") };
     } catch (error) {
-      await response.body?.cancel().catch(() => undefined);
-      throw error;
-    }
+      if (response) cancelPaidResponseBody(response);
+      if (error instanceof OmniContractError || error instanceof OmniApiError) throw error;
+      throw redactedPaymentError(error);
+    } finally { clearTimeout(timer); }
   }
 
   liquidationLevelsScreenshot(symbol: X402Symbol, query: LiquidationLevelsScreenshotQuery = {}): Promise<PaidResult<ScreenshotPng>> {
@@ -560,4 +559,24 @@ function redactedPaymentError(error: unknown): Error {
     : message.includes("Payment authorization limit reached") ? "PAYMENT_AUTHORIZATION_LIMIT" : "PAYMENT_OUTCOME_UNKNOWN";
   const kind = error instanceof Error && (error.name === "AbortError" || error.name === "TimeoutError") ? error.name : undefined;
   return new OmniPaymentError(code, kind);
+}
+
+
+function cancelPaidResponseBody(response: Response): void {
+  // Best-effort cleanup must not extend the caller deadline or expose adapter errors.
+  try { void response.body?.cancel().catch(() => undefined); } catch { /* already locked/closed */ }
+}
+
+async function waitForScreenshot<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) {
+    void promise.catch(() => undefined);
+    signal.throwIfAborted();
+  }
+  let rejectOnAbort!: () => void;
+  const aborted = new Promise<never>((_, reject) => {
+    rejectOnAbort = () => reject(signal.reason);
+    signal.addEventListener("abort", rejectOnAbort, { once: true });
+  });
+  try { return await Promise.race([promise, aborted]); }
+  finally { signal.removeEventListener("abort", rejectOnAbort); }
 }
