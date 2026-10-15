@@ -62,6 +62,7 @@ export class HyperliquidTestnetExecutor {
 
   async run(intent: AgentIntent, config: TestnetExecutionConfig): Promise<TestnetExecutionResult> {
     if (intent.side === "HOLD") return { mode: "hold", intent };
+    if (intent.symbol !== config.symbol) throw new Error("Intent symbol does not match configured instrument");
     if (!Number.isFinite(intent.confidence) || intent.confidence < 0 || intent.confidence > 1) {
       throw new RangeError("Agent confidence must be between zero and one");
     }

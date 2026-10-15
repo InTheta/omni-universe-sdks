@@ -14,7 +14,7 @@ The examples use the community TypeScript client linked by Hyperliquid's officia
 | `mean-reversion-agent.ts` | Live Hyperliquid testnet candles | Deterministic deviation decision, then HOLD or a capped ALO order preview |
 | `omni-risk-agent.ts` | Omni `market-risk` through paid x402 REST or paid MCP | Omni guardrail decision, then HOLD or a capped Hyperliquid testnet ALO order preview |
 
-All agents are dry-run by default and convert signals below `TESTNET_MIN_CONFIDENCE` to `HOLD`. A trade-capable run requires a funded testnet account, a testnet-only private key, and two exact opt-ins. The order lifecycle uses an add-liquidity-only order 50–500 basis points away from the midpoint, caps notional at `$25`, verifies that the order is resting, cancels it immediately, and verifies it is no longer open.
+All agents are dry-run by default and convert signals below `TESTNET_MIN_CONFIDENCE` to `HOLD`. A trade-capable run requires a funded testnet account, a testnet-only private key, and two exact opt-ins. Dry-run plans allow offsets of 50–500 basis points. The enabled order lifecycle requires an add-liquidity-only order exactly 200 basis points away from the midpoint, caps notional at `$25`, verifies that the order is resting, cancels it immediately, and verifies it is no longer open.
 
 ## Install and run
 
@@ -54,13 +54,13 @@ TESTNET_ORDER_OFFSET_BPS=200
 TESTNET_MIN_CONFIDENCE=0.55
 ```
 
-For a master-wallet key, `HL_TESTNET_ACCOUNT_ADDRESS` can be left blank. For an approved API wallet, set it to the owning testnet account address. Then run:
+Set `HL_TESTNET_ACCOUNT_ADDRESS` explicitly for both a dedicated owner-wallet key and an approved API wallet. It must name the exact owning testnet account. Directional intent symbols must match the configured instrument before market access or execution. Then run:
 
 ```bash
 npm run test:order
 ```
 
-For GitHub Actions, configure `HL_TESTNET_PRIVATE_KEY` and optionally `HL_TESTNET_ACCOUNT_ADDRESS` as repository secrets, manually dispatch `SDK CI`, and select `run_testnet_order_lifecycle`. Scheduled and pull-request runs never enable funded orders.
+For GitHub Actions, configure `HL_TESTNET_PRIVATE_KEY` and `HL_TESTNET_ACCOUNT_ADDRESS` as repository secrets, manually dispatch `SDK CI`, and select `run_testnet_order_lifecycle`. Scheduled and pull-request runs never enable funded orders.
 
 Hyperliquid's testnet faucet requires the same address to have deposited on mainnet before it can claim mock USDC. See the [official testnet faucet instructions](https://hyperliquid.gitbook.io/hyperliquid-docs/onboarding/testnet-faucet) and [official API network documentation](https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api).
 

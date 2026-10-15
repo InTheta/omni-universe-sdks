@@ -101,3 +101,23 @@ test("cancellation verification tolerates bounded open-order propagation and the
 test("Omni research cannot purchase without the explicit paid-research gate", async () => {
   await assert.rejects(loadOmniMarketRisk("BTC", {}), /RUN_PAID_RESEARCH=true/);
 });
+
+test("directional intent must match configured instrument before any market lookup", async () => {
+  for (const enabled of [false, true]) {
+    const config = { ...readTestnetExecutionConfig({ TESTNET_SYMBOL: "BTC" }), enabled };
+    const executor = new HyperliquidTestnetExecutor();
+    let marketReads = 0;
+    executor.market = async () => {
+      marketReads += 1;
+      throw new Error("Unexpected market lookup");
+    };
+    await assert.rejects(executor.run({
+      confidence: 1,
+      maxNotionalUsd: 15,
+      rationale: ["exact instrument regression"],
+      side: "BUY",
+      symbol: "ETH",
+    }, config), /Intent symbol does not match configured instrument/);
+    assert.equal(marketReads, 0);
+  }
+});

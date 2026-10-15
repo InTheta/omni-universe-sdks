@@ -53,3 +53,10 @@ node --import tsx --test test/guarded-testnet.test.ts
 ```
 
 Those fixtures make no venue writes and are not sandbox-executed evidence. A funded lifecycle remains unverified until the protected testnet signer, owning account, builder approval and actual order/fill evidence are available.
+
+
+Cancellation uses authoritative order status and current exact-symbol asset metadata; it does not require a fresh order book. Missing or ambiguous metadata, an asset-index mismatch, unknown order status or invalid signer authority still stops cancellation for explicit recovery. No fallback asset is submitted.
+
+The example runner reports success and removes its session lock only after complete reconciliation and flat final exposure. A filled status without indexed fills, unexplained exposure, incomplete cleanup or missing reconciliation fields preserves the lock and journals. Restore visibility and reconcile those same journals before a new entry.
+
+Current scope does not include amendment/cancel-replace, vault/subaccount execution, or a funding/PnL ledger. Returned order-fill fee fields are not a complete account ledger or proof of builder credit. Funded execution and authoritative builder-export reconciliation remain separate verification requirements.

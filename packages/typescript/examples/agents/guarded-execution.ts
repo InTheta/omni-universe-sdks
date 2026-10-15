@@ -2,6 +2,7 @@ import { mkdir, writeFile, rename, readdir, readFile, open, unlink } from "node:
 import { resolve, join } from "node:path";
 import { GuardedTestnetExecutor, type TestnetJournal } from "@omni-terminal/sdk";
 import { privateKeyToAccount } from "viem/accounts";
+import { runGuardedLifecycle } from "./guarded-lifecycle.js";
 
 // The operator supplies a dedicated testnet runtime environment.
 const enabled = process.env.RUN_TESTNET_ORDERS === "true";
@@ -39,17 +40,9 @@ else {
   const existing = (await readdir(directory)).filter(name => name.endsWith(".json") || name.endsWith(".tmp"));
   if (existing.length) throw new Error("Existing execution journals: reconcile them before a new session");
   try {
-    const entry = await executor.submit(plan);
-    const result = await executor.cancel(entry);
-    if (result.fills?.length) {
-      const reduction = await executor.previewReduction(entry);
-      const cleanup = await executor.submit(reduction);
-      const final = await executor.cancel(cleanup);
-      console.log(JSON.stringify({ mode: "testnet-cleanup", result: final }));
-      if (!final.complete || final.remainingExposure?.length) throw new Error("Cleanup incomplete; preserve recovery journal");
-    }
+    const result = await runGuardedLifecycle(executor, plan);
+    await unlink(lock);
     console.log(JSON.stringify({ mode: "testnet-executed", result }));
-    if (result.complete) await unlink(lock);
   } catch {
     throw new Error("Execution interrupted or uncertain; preserve journal and lock, query status/cancel/reconcile using public SDK; never rerun blindly");
   }
