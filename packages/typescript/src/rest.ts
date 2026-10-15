@@ -159,9 +159,16 @@ function validateNewsWebSocketTicket(route: string, data: unknown): NewsWebSocke
 
 function validateAskOmniRequest(input: AskOmniRequest): void {
   if (!input || typeof input !== "object" || Array.isArray(input)) throw new TypeError("Ask Omni input must be an object");
-  const question = input.question === undefined ? undefined : normalizeString("question", input.question, 1, 10_000);
+  if (input.question !== undefined) normalizeString("question", input.question, 0, 10_000);
   const preset = input.presetId === undefined ? undefined : normalizeString("presetId", input.presetId, 1, 100);
-  if (!question && !preset) throw new RangeError("Ask Omni requires question or presetId");
+  const supportedPresets = [
+    "risk_overview", "liquidation_check", "leverage_check", "performance_review",
+    "global_sentiment", "tradfi_sentiment", "energy_sentiment", "btc_sentiment",
+    "oil_sentiment", "hedge_first",
+  ];
+  if (!preset || !supportedPresets.includes(preset.toLowerCase())) {
+    throw new RangeError("Ask Omni requires a supported presetId; question alone is not sufficient");
+  }
   if (input.extraContext !== undefined) normalizeString("extraContext", input.extraContext, 1, 20_000);
   if (input.scopeAddress !== undefined) assertEvmAddress(input.scopeAddress);
   if (input.selectedSymbol !== undefined) normalizeString("selectedSymbol", input.selectedSymbol, 1, 32);

@@ -4,8 +4,8 @@ Public TypeScript clients for Node.js 20.19+ covering Omni's AI News, enriched a
 
 The SDK follows the published contracts:
 
-- REST/WS OpenAPI: `https://omniterminal.app/openapi.yaml` (observed v1.3.0)
-- x402 OpenAPI: `https://omniterminal.app/openapi-x402.yaml` (observed v0.8.0)
+- REST/WS OpenAPI: `https://omniterminal.app/openapi.yaml` (observed v1.4.0)
+- x402 OpenAPI: `https://omniterminal.app/openapi-x402.yaml` (observed v0.11.0)
 - MCP: `https://omniterminal.app/api/x402/mcp` (Streamable HTTP, protocol `2025-06-18`)
 
 Private deployment addresses are deliberately not embedded. Override the public defaults with `OMNI_API_URL`, `OMNI_APP_URL`, `OMNI_WS_URL`, and `OMNI_MCP_URL` in your own environment.
@@ -25,13 +25,30 @@ The public source release is available in this repository. npm registry publicat
 npm install https://github.com/InTheta/omni-universe-sdks/releases/download/v0.8.0/omni-terminal-sdk-0.8.0.tgz
 ```
 
-For source development:
+These are public contract versions checked on 15 October 2026, not SDK package
+versions. The latest GitHub artifact remains v0.8.0; repository main is v0.8.1
+source. The live schema and unpaid payment challenge take precedence over a
+version or price recorded in this guide.
+
+The v0.8.0 artifact contains nine JSON product helpers and does not include
+`premarketRoundup()`, `premarketRoundupData()`, the forced-free `:free` scripts,
+or newer verification/demo commands. The ten-product examples below describe
+current source. Installing the tarball into a consumer project does not install
+repository test commands; use the source checkout for those.
+
+For source development, start at a fresh checkout (Node.js 20.19+):
 
 ```bash
+git clone https://github.com/InTheta/omni-universe-sdks.git
+cd omni-universe-sdks/packages/typescript
 npm ci
-cp .env.example .env
 npm run verify:live
 ```
+
+No `.env` or credential is needed for this first run. `verify:live` forces the
+free-only variants even if paid flags are present in the process environment.
+Copy `.env.example` only when deliberately adding a separate access authority.
+Never put a funded key in shell history.
 
 Every `npm run example:*` command loads `.env` when that file exists. Values already present in the process environment take precedence, so deployment and CI secrets do not need an on-disk file.
 
@@ -89,6 +106,12 @@ Implemented REST operations:
 
 Authenticated methods fail locally when `OMNI_API_KEY` is missing. News filters, symbols, wallet addresses, Ask Omni inputs, and builder-fee windows are validated before fetch; successful News list and WebSocket-ticket responses are checked against their published runtime contracts before being returned.
 
+Ask Omni also requires a supported `presetId` on the server; a free-form question
+alone is rejected. A News product entitlement is not general API-plan access.
+The source REST example skips Ask Omni unless `RUN_ASK_OMNI=true` is explicitly
+set and the key's account has the appropriate API-enabled plan. The forced
+`example:rest:public` variant never runs either keyed operation.
+
 ## WebSocket
 
 ```ts
@@ -109,6 +132,13 @@ for await (const event of ws.news(ticket)) console.log(event.data);
 ```
 
 The news client sends a JSON ping every 55 seconds, inside the documented 60-second recommendation and 120-second idle timeout. Its receive queue is bounded to 1,000 frames by default and can be changed with `maxQueueSize`; when full, the oldest frame is discarded.
+
+Unlike the direct Hyperliquid client, the Omni News iterator does not reconnect
+automatically or replay history. Obtain a fresh single-use ticket before each new
+connection and reconcile missed history through REST. Iterator values include
+`subscribed`, `pong` and error control frames as well as event envelopes; inspect
+the envelope and payload timestamps before treating a frame as fresh news. The
+`ws-news` example stops after five received frames, not five verified news events.
 
 ## x402 REST — all ten paid JSON routes
 
@@ -142,9 +172,31 @@ Paid methods return contract-shaped TypeScript objects. They validate runtime sy
 `premarketRoundup({ date: "2026-08-11" })` for an exact publication date, or include
 `limit: 1..5`. The numeric form, such as `premarketRoundup(1)`, remains supported.
 
-Run `npm run example:x402`. It makes only the two free health calls unless `RUN_PAID_EXAMPLES=true` is explicitly set; with that flag it purchases every route once.
+Start with `npm run example:x402:free`; it forces only the two free health calls,
+even when paid flags are inherited. The deliberately armed source example
+`example:x402` attempts eleven purchases across ten JSON products, including
+both latest and dated pre-market roundup queries. The current roundup challenge
+is $0.100 and is rejected by the default $0.010 per-call cap. Do not raise the cap
+merely to make an all-routes run pass: approve an exact product and aggregate
+budget first. Uncertain settlement requires reconciliation before retry.
 
 ## MCP — every tool
+
+For discovery, no key or payment approval is needed:
+
+```ts
+import { OmniMcpClient } from "@omni-terminal/sdk";
+
+const mcp = await new OmniMcpClient().connect();
+try {
+  console.log((await mcp.catalogData()).data);
+} finally {
+  await mcp.close();
+}
+```
+
+The following is a deliberately paid example, not the first-run path. Choose one
+tool, enforce its cap, and close the client even when a call fails:
 
 ```ts
 import { OmniMcpClient } from "@omni-terminal/sdk";
@@ -152,25 +204,23 @@ import { OmniMcpClient } from "@omni-terminal/sdk";
 const mcp = await new OmniMcpClient({
   privateKey: process.env.EVM_PRIVATE_KEY as `0x${string}`,
   maxPaymentUsd: 0.01,
-  approvePayment: ({ paymentRequired }) => {
+  approvePayment: ({ toolName, paymentRequired }) => {
     console.log(paymentRequired.accepts);
-    return true;
+    return toolName === "get_market_risk_context";
   },
 }).connect();
 
-console.log((await mcp.catalogData()).data);       // free, parsed and validated
-console.log(await mcp.marketMovingEventsData({ symbol: "BTC" }));
-console.log(await mcp.marketRiskData({ symbol: "BTC" }));
-console.log(await mcp.resolveEntitiesData(["bitcoin"]));
-console.log(await mcp.marketCarryData("BTC"));
-console.log(await mcp.premarketRoundupData(1));
-console.log(await mcp.premarketRoundupData({ date: "2026-08-11" }));
-await mcp.close();
+try {
+  console.log((await mcp.catalogData()).data); // free, parsed and validated
+  console.log(await mcp.marketRiskData({ symbol: "BTC" }));
+} finally {
+  await mcp.close();
+}
 ```
 
 Paid MCP calls are denied by default. Supply an `approvePayment` callback so the application owns the spending decision. The payment client independently enforces `maxPaymentUsd`, even if the callback approves a larger challenge. The SDK validates every live tool's required fields, ranges, enums, batch sizes, and allowed property names before the payment-aware MCP client is invoked. Paid results must contain a successful settlement receipt, and the `*Data()` helpers parse and validate each product's JSON service/schema contract. Raw `callTool()` and non-`Data` helpers remain available. The free catalog is never allowed to trigger payment. `npm run example:mcp` targets the free catalog and all five paid tools.
 
-Use [`docs/ask-omni-bundles.md`](docs/ask-omni-bundles.md) and `npm run example:ask-omni:demo` for the Agentic Market-style brief, deep, and visual recipes. The no-spend demo prints the full plan; paid mode is separately armed and capped at 0.050 USDC.
+Use [`docs/ask-omni-bundles.md`](docs/ask-omni-bundles.md) and `npm run example:ask-omni:demo` for the brief, deep, and visual recipes. Current complete bundles cost 0.120–0.144 USDC. The example preserves its 0.030-USDC default total budget and 0.010-USDC per-call cap, so defaults reject before any paid work. `BundleBudget` preflights the complete plan, reserves against concurrent calls sharing one instance, and deduplicates same-ID retries within that instance. Larger total and per-call limits require explicit caller input; this is not a durable or atomic payment service. Only hermetic/demo execution is qualified; no funded bundle was run.
 
 ## Trading agents
 
@@ -222,6 +272,6 @@ npm audit --omit=dev
 - x402 buyer quickstart: https://docs.x402.org/getting-started/quickstart-for-buyers
 - MCP TypeScript client: https://ts.sdk.modelcontextprotocol.io/client
 - Coinbase Advanced Trade: https://docs.cdp.coinbase.com/coinbase-app/advanced-trade-apis/rest-api
-- Coinbase Agentic Wallet MCP: https://docs.cdp.coinbase.com/payments-mcp/quickstart
+- Coinbase Agentic Wallet MCP: https://docs.cdp.coinbase.com/agentic-wallet/mcp/quickstart
 - Robinhood Agentic Trading MCP: https://robinhood.com/us/en/support/articles/agentic-trading-overview/
 - Robinhood Crypto Trading API: https://docs.robinhood.com/crypto/trading/

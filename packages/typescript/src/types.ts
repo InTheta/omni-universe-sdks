@@ -82,9 +82,14 @@ export interface NewsQuery {
   topics?: string | string[];
 }
 
+export type AskOmniPreset =
+  | "risk_overview" | "liquidation_check" | "leverage_check" | "performance_review"
+  | "global_sentiment" | "tradfi_sentiment" | "energy_sentiment" | "btc_sentiment"
+  | "oil_sentiment" | "hedge_first";
+
 export interface AskOmniRequest {
   question?: string;
-  presetId?: string;
+  presetId: AskOmniPreset;
   extraContext?: string;
   scopeAddress?: string;
   selectedSymbol?: string;

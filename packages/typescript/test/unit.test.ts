@@ -132,18 +132,18 @@ test("x402 client rejects invalid paid calls before invoking fetch", () => {
 
 test("Ask Omni bundle plans keep costs bounded and execution separate", () => {
   const brief = createAskOmniBundlePlan({ symbol: "BTC", tier: "brief" });
-  assert.equal(brief.estimatedCostUsdc, "0.016");
+  assert.equal(brief.estimatedCostUsdc, "0.120");
   assert.deepEqual(brief.steps.map((step) => step.id), [
     "published_roundup",
     "moving_events",
     "market_risk",
   ]);
   const deep = createAskOmniBundlePlan({ symbol: "BTC", tier: "deep", mention: "bitcoin" });
-  assert.equal(deep.estimatedCostUsdc, "0.030");
+  assert.equal(deep.estimatedCostUsdc, "0.134");
   assert.equal(deep.steps[0]?.id, "resolve_entities");
   assert.equal(deep.executionBoundary.placesOrders, false);
   const visual = createAskOmniBundlePlan({ symbol: "ETH", tier: "visual", mention: "ether" });
-  assert.equal(visual.estimatedCostUsdc, "0.040");
+  assert.equal(visual.estimatedCostUsdc, "0.144");
   assert.equal(visual.steps.at(-1)?.parallelGroup, 2);
 });
 
@@ -290,13 +290,36 @@ test("keyed REST calls reject invalid inputs before invoking fetch", async () =>
   assert.throws(() => client.publicProfile("not-an-address"), /20-byte EVM address/);
   assert.throws(() => client.builderFees(200, 100), /startTimestamp < endTimestamp/);
   assert.throws(() => client.builderFees(0, 367 * 24 * 60 * 60), /cannot exceed 366 days/);
-  assert.throws(() => client.askOmni({}), /requires question or presetId/);
-  assert.throws(() => client.askOmni({ question: "test", scopeAddress: "bad" }), /20-byte EVM address/);
+  assert.throws(() => client.askOmni({} as never), /requires a supported presetId/);
+  assert.throws(() => client.askOmni({ question: "test" } as never), /question alone is not sufficient/);
+  assert.throws(() => client.askOmni({ presetId: "unknown" } as never), /requires a supported presetId/);
+  assert.throws(() => client.askOmni({ presetId: "risk_overview", question: "test", scopeAddress: "bad" }), /20-byte EVM address/);
   assert.equal(fetchCalls, 0);
 
   const missingKey = new OmniClient({ fetch: async () => { fetchCalls++; return Response.json({}); } });
   await assert.rejects(missingKey.news(), /Omni API key is required/);
   assert.equal(fetchCalls, 0);
+});
+
+test("Ask Omni permits every documented preset and an empty optional refinement", async () => {
+  const sent: Record<string, unknown>[] = [];
+  const client = new OmniClient({
+    apiKey: "test-only",
+    fetch: async (_input, init) => {
+      sent.push(JSON.parse(String(init?.body)));
+      return Response.json({ message: "mock analysis" });
+    },
+  });
+  for (const presetId of [
+    "risk_overview", "liquidation_check", "leverage_check", "performance_review",
+    "global_sentiment", "tradfi_sentiment", "energy_sentiment", "btc_sentiment",
+    "oil_sentiment", "hedge_first",
+  ] as const) {
+    await client.askOmni({ presetId, question: "" });
+    assert.equal(sent.at(-1)?.presetId, presetId);
+    assert.equal(sent.at(-1)?.question, "");
+  }
+  assert.equal(sent.length, 10);
 });
 
 test("keyed REST calls fail closed on malformed News and ticket responses", async () => {

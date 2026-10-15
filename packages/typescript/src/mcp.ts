@@ -40,6 +40,8 @@ export interface OmniMcpDataResult<T> {
 }
 
 export interface OmniMcpClientOptions {
+  maxPaymentAuthorizations?: number;
+  allowedNetworks?: readonly ("eip155:84532" | "eip155:8453")[];
   url?: string;
   privateKey?: `0x${string}`;
   maxPaymentUsd?: number;
@@ -59,7 +61,11 @@ export class OmniMcpClient {
       version: options.version ?? SDK_VERSION,
     });
     const paymentClient = options.privateKey
-      ? createEvmPaymentClient(options.privateKey, { maxPaymentUsd: options.maxPaymentUsd ?? DEFAULT_MAX_X402_PAYMENT_USD })
+      ? createEvmPaymentClient(options.privateKey, {
+        maxPaymentUsd: options.maxPaymentUsd ?? DEFAULT_MAX_X402_PAYMENT_USD,
+        maxPaymentAuthorizations: options.maxPaymentAuthorizations,
+        allowedNetworks: options.allowedNetworks,
+      })
       : new x402Client();
     this.client = wrapMCPClientWithPayment(rawClient, paymentClient, {
       autoPayment: true,

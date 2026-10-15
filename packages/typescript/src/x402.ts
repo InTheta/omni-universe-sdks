@@ -30,6 +30,8 @@ export interface OmniX402ClientOptions {
 }
 
 export interface EvmPaymentClientOptions {
+  /** Optional instance-local authorization cap; exhausted attempts require reconciliation, not a reset/retry. */
+  maxPaymentAuthorizations?: number;
   /** Maximum USDC authorized for one Omni x402 call. USDC uses six decimal places. */
   maxPaymentUsd?: number;
   allowedNetworks?: readonly ("eip155:84532" | "eip155:8453")[];
@@ -49,14 +51,25 @@ export function createEvmPaymentClient(
   const signer = privateKeyToAccount(privateKey);
   const maxPaymentAtomic = usdToUsdcAtomic(options.maxPaymentUsd ?? DEFAULT_MAX_X402_PAYMENT_USD);
   const allowedNetworks = new Set(options.allowedNetworks ?? ["eip155:84532", "eip155:8453"]);
-  const allowedAssets = options.allowedAssets ?? OMNI_USDC_ASSETS;
+  const allowedAssets = new Map(Object.entries(options.allowedAssets ?? OMNI_USDC_ASSETS)
+    .map(([network, assets]) => [network, new Set(assets.map((asset) => asset.toLowerCase()))]));
+  const maxPaymentAuthorizations = options.maxPaymentAuthorizations;
+  if (maxPaymentAuthorizations !== undefined && (!Number.isSafeInteger(maxPaymentAuthorizations) || maxPaymentAuthorizations < 1)) {
+    throw new RangeError("maxPaymentAuthorizations must be a positive safe integer");
+  }
+  let authorizations = 0;
   return new x402Client()
+    .onBeforePaymentCreation(async () => {
+      if (maxPaymentAuthorizations === undefined) return;
+      if (authorizations >= maxPaymentAuthorizations) return { abort: true, reason: "Payment authorization limit reached; reconcile before any new payment" };
+      authorizations++;
+    })
     .register("eip155:*", new ExactEvmScheme(signer))
     .registerPolicy((_version, requirements) => requirements.filter((requirement) => {
       const network = requirement.network as "eip155:84532" | "eip155:8453";
       if (!allowedNetworks.has(network)) return false;
-      const networkAssets = allowedAssets[network];
-      if (!networkAssets?.some((asset) => asset.toLowerCase() === requirement.asset.toLowerCase())) return false;
+      const networkAssets = allowedAssets.get(network);
+      if (!networkAssets?.has(requirement.asset.toLowerCase())) return false;
       try { return BigInt(requirement.amount) <= maxPaymentAtomic; }
       catch { return false; }
     }));

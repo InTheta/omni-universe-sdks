@@ -3,6 +3,20 @@ import type { X402Symbol } from "./types.js";
 export type AskOmniBundleTier = "brief" | "deep" | "visual";
 export type AskOmniBundleTransport = "mcp+x402" | "http+x402";
 
+/** Validate the PNG signature and first IHDR dimensions, not full image/CRC integrity. */
+export function validateBundlePngHeader(bytes: Uint8Array): { width: number; height: number } {
+  const signature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+  if (bytes.length < 33 || !signature.every((value, index) => bytes[index] === value)) {
+    throw new Error("Visual route did not return a PNG header");
+  }
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (view.getUint32(8) !== 13 || view.getUint32(12) !== 0x49484452) throw new Error("Visual PNG is missing its initial IHDR");
+  const width = view.getUint32(16);
+  const height = view.getUint32(20);
+  if (width < 1 || height < 1 || width > 0x7fffffff || height > 0x7fffffff) throw new Error("Visual PNG dimensions are invalid");
+  return { width, height };
+}
+
 export interface AskOmniBundleStep {
   id:
     | "resolve_entities"
@@ -55,7 +69,7 @@ const coreSteps = (symbol: X402Symbol): AskOmniBundleStep[] => [
     transport: "mcp+x402",
     tool: "get_premarket_roundup",
     schema: "premarket_roundup.v1",
-    priceAtomic: 5_000,
+    priceAtomic: 100_000,
     required: true,
     parallelGroup: 1,
     purpose: "Add the latest citable Omni morning thesis and canonical publication link.",
@@ -66,7 +80,7 @@ const coreSteps = (symbol: X402Symbol): AskOmniBundleStep[] => [
     transport: "mcp+x402",
     tool: "get_market_moving_events",
     schema: "news_pulse.v1",
-    priceAtomic: 1_000,
+    priceAtomic: 10_000,
     required: true,
     parallelGroup: 1,
     purpose: "Find fresh catalysts, sentiment, impact, confidence, and affected tickers.",

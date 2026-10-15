@@ -134,7 +134,7 @@ calls only its authenticated preview endpoint and Robinhood Crypto makes no netw
 
 Official references:
 
-- Coinbase Agentic Wallet MCP quickstart: https://docs.cdp.coinbase.com/payments-mcp/quickstart
+- Coinbase Agentic Wallet MCP quickstart: https://docs.cdp.coinbase.com/agentic-wallet/mcp/quickstart
 - Coinbase x402 Bazaar MCP: https://docs.cdp.coinbase.com/x402/bazaar
 - Coinbase Advanced Trade preview: https://docs.cdp.coinbase.com/api-reference/advanced-trade-api/rest-api/orders/preview-orders
 - Robinhood Agentic Trading: https://robinhood.com/us/en/support/articles/agentic-trading-overview/
