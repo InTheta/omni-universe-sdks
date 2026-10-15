@@ -9,8 +9,25 @@ function safeRetryAfter(value: string | null): string | null {
   return /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun), \d{2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4} \d{2}:\d{2}:\d{2} GMT$/.test(value) && Number.isFinite(Date.parse(value)) ? value : null;
 }
 
+const PUBLIC_ERROR_CODES = new Set([
+  "insufficient_funds", "invalid_exact_evm_payload_authorization_valid_after",
+  "invalid_exact_evm_payload_authorization_valid_before", "invalid_exact_evm_payload_authorization_value_mismatch",
+  "invalid_exact_evm_payload_signature", "invalid_exact_evm_payload_recipient_mismatch", "invalid_network",
+  "invalid_payload", "invalid_payment_requirements", "invalid_scheme", "unsupported_scheme", "invalid_x402_version",
+  "invalid_transaction_state", "unexpected_verify_error", "unexpected_settle_error", "invalid_request",
+  "upstream_unavailable", "merchant_metrics_unavailable", "rate_limited", "forbidden", "unauthorized", "not_found",
+]);
+function safeErrorCode(body: unknown): string {
+  if (!body || typeof body !== "object") return "HTTP_ERROR";
+  const record = body as Record<string, unknown>;
+  for (const candidate of [record.code, record.error, record.detail]) {
+    if (typeof candidate === "string" && PUBLIC_ERROR_CODES.has(candidate)) return candidate;
+  }
+  return "HTTP_ERROR";
+}
+
 export class OmniApiError extends Error {
-  readonly code = "HTTP_ERROR";
+  readonly code: string;
   readonly status: number;
   readonly requestId: string | null;
   readonly retryAfter: string | null;
@@ -20,6 +37,7 @@ export class OmniApiError extends Error {
     super(message);
     this.name = "OmniApiError";
     this.status = status;
+    this.code = safeErrorCode(_details);
     this.requestId = safeRequestId(response.headers.get("x-request-id"));
     this.retryAfter = safeRetryAfter(response.headers.get("retry-after"));
     this.details = { code: this.code, status, responseBodyRedacted: true };

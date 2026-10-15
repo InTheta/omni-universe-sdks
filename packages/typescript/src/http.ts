@@ -40,7 +40,7 @@ export async function parseResponse<T>(response: Response): Promise<T> {
       422: "request validation failed", 429: "rate limited", 500: "server error",
       502: "upstream error", 503: "service unavailable", 504: "upstream timeout",
     };
-    throw new OmniApiError(`Omni API ${response.status}: ${reasons[response.status] ?? "request failed"}`, response.status, response, undefined);
+    throw new OmniApiError(`Omni API ${response.status}: ${reasons[response.status] ?? "request failed"}`, response.status, response, body);
   }
   return body as T;
 }

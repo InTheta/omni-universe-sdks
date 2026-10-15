@@ -31,3 +31,12 @@ test("safe correlation IDs and retry metadata remain available", () => {
   assert.equal(error.retryAfter, "30");
   assert.deepEqual(error.details, {code:"HTTP_ERROR",status:429,responseBodyRedacted:true});
 });
+
+test("official machine-readable payment error codes survive body redaction", async () => {
+  await assert.rejects(parseResponse(Response.json({error: "invalid_exact_evm_payload_recipient_mismatch", detail: secret, proof: secret}, {status:402})), error => {
+    assert.ok(error instanceof OmniApiError);
+    assert.equal(error.code, "invalid_exact_evm_payload_recipient_mismatch");
+    assert.ok(!logged(error).includes(secret));
+    return true;
+  });
+});
