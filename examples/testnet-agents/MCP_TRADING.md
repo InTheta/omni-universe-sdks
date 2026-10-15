@@ -90,7 +90,8 @@ request or disconnecting does **not** prove an exchange order was canceled.
 The journal is private (`0600`), atomically replaced and fsynced. A separate
 exclusive process lock prevents two servers from opening the same ledger.
 Normal shutdown removes the lock. After a crash, verify the recorded lock PID
-is no longer alive before removing only that stale lock. Preserve the journal.
+is no longer alive and inspect authoritative order/fill state for journal cloids
+before removing only that stale lock. Preserve the journal.
 Recover using the original returned plan ID and the same fixed account/policy:
 
 ```bash

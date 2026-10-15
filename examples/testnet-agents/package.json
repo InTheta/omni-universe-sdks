@@ -9,7 +9,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test test/unit.test.ts",
+    "test": "node --import tsx --test test/unit.test.ts test/mcp-trading.test.ts",
     "test:live": "node --import tsx --test test/live.test.ts",
     "test:signed": "node --import tsx --test test/signed-contract.test.ts",
     "test:order": "node --env-file-if-exists=.env --import tsx --test test/order-lifecycle.test.ts",
