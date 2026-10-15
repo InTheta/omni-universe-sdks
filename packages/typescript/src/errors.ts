@@ -70,3 +70,15 @@ export class TradingGateError extends Error {
     this.name = "TradingGateError";
   }
 }
+
+/** A failed paid transport is never automatically safe to retry with a new authorization. */
+export class OmniPaymentError extends Error {
+  readonly requiresReconciliation = true;
+  readonly retryable = false;
+  constructor(readonly code: "PAYMENT_BUDGET_EXCEEDED" | "PAYMENT_AUTHORIZATION_LIMIT" | "PAYMENT_OUTCOME_UNKNOWN", kind?: "AbortError" | "TimeoutError") {
+    super(code === "PAYMENT_BUDGET_EXCEEDED" ? "Aggregate payment authorization budget exceeded; reconcile before any new payment"
+      : code === "PAYMENT_AUTHORIZATION_LIMIT" ? "Payment authorization limit reached; reconcile before any new payment"
+      : "Paid request failed; payment outcome is unconfirmed. Reconcile before any new paid attempt.");
+    this.name = kind ?? "OmniPaymentError";
+  }
+}

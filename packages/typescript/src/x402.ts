@@ -3,7 +3,7 @@ import { x402Client, x402HTTPClient } from "@x402/core/client";
 import { ExactEvmScheme } from "@x402/evm/exact/client";
 import { wrapFetchWithPayment } from "@x402/fetch";
 import { privateKeyToAccount } from "viem/accounts";
-import { OmniContractError } from "./errors.js";
+import { OmniContractError, OmniPaymentError } from "./errors.js";
 import { buildUrl, mergeSignals, parseResponse, type QueryValue } from "./http.js";
 import type {
   EntityResolution,
@@ -146,13 +146,24 @@ export class OmniX402Client {
     const headers = new Headers({ accept: "application/json" });
     if (options.body !== undefined) headers.set("content-type", "application/json");
     const transport = options.contract && options.contract.schema === undefined ? this.rawFetcher : this.fetcher;
-    const response = await transport(buildUrl(this.baseUrl, path, options.query), {
-      method,
-      redirect: "error",
-      headers,
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
-      signal: mergeSignals(this.timeoutMs, options.signal),
-    });
+    let response: Response;
+    try {
+      response = await transport(buildUrl(this.baseUrl, path, options.query), {
+        method,
+        redirect: "error",
+        headers,
+        body: options.body === undefined ? undefined : JSON.stringify(options.body),
+        signal: mergeSignals(this.timeoutMs, options.signal),
+      });
+    } catch (error) {
+      if (error instanceof OmniContractError) throw error;
+      // Dependencies can embed the entire untrusted payment challenge in their error text.
+      const message = error instanceof Error ? error.message : "";
+      const code = message.includes("Aggregate payment authorization budget exceeded") ? "PAYMENT_BUDGET_EXCEEDED"
+        : message.includes("Payment authorization limit reached") ? "PAYMENT_AUTHORIZATION_LIMIT" : "PAYMENT_OUTCOME_UNKNOWN";
+      const kind = error instanceof Error && (error.name === "AbortError" || error.name === "TimeoutError") ? error.name : undefined;
+      throw new OmniPaymentError(code, kind);
+    }
     const data = await parseResponse<T>(response);
     if (options.contract) validateProductContract(path, data, options.contract);
     let payment: PaymentReceipt | null = null;
