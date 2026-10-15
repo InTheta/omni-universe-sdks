@@ -22,23 +22,25 @@ export async function parseResponse<T>(response: Response): Promise<T> {
     try {
       body = await response.json();
     } catch (error) {
-      if (response.ok) throw new OmniApiError("API returned invalid JSON", response.status, response, { cause: String(error) });
+      if (response.ok) throw new OmniApiError("API returned invalid JSON", response.status, response, undefined);
       body = null;
     }
   } else {
     body = await response.text().catch(() => "");
     if (response.ok) {
-      throw new OmniApiError(`API returned an unexpected content type: ${contentType || "missing"}`, response.status, response, body);
+      throw new OmniApiError("API returned an unexpected content type", response.status, response, body);
     }
   }
 
   if (!response.ok) {
-    const detail = body && typeof body === "object" && "detail" in body
-      ? String((body as { detail: unknown }).detail)
-      : body && typeof body === "object" && "error" in body
-        ? String((body as { error: unknown }).error)
-        : response.statusText;
-    throw new OmniApiError(`Omni API ${response.status}: ${detail}`, response.status, response, body);
+    // Never echo an untrusted body/statusText: it may contain a payment proof or token.
+    const reasons: Record<number, string> = {
+      400: "invalid request", 401: "authentication required", 402: "payment required",
+      403: "permission denied", 404: "resource not found", 409: "request conflict",
+      422: "request validation failed", 429: "rate limited", 500: "server error",
+      502: "upstream error", 503: "service unavailable", 504: "upstream timeout",
+    };
+    throw new OmniApiError(`Omni API ${response.status}: ${reasons[response.status] ?? "request failed"}`, response.status, response, body);
   }
   return body as T;
 }

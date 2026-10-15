@@ -17,9 +17,11 @@ export function assertDemoIsDryRun(demo: boolean, liveTrading: boolean): void {
 export function demoMarketRisk(symbol: X402Symbol): MarketRisk {
   return {
     symbol,
-    freshness: { mode: "deterministic-demo-fixture" },
-    funding: { carry: { funding_rate_per_hour: 0.0001 } },
+    freshness: { status: "fresh", mode: "deterministic-demo-fixture", age_seconds: 0, max_age_seconds: 60 },
+    liquidations: { freshness: { status: "fresh", age_seconds: 0, max_age_seconds: 60 } },
+    funding: { carry: { funding_rate_per_hour: 0.0001 }, freshness: { status: "fresh", age_seconds: 0, max_age_seconds: 60 } },
     news: {
+      freshness: { status: "fresh", age_seconds: 0, max_age_seconds: 60 },
       items: [{
         confidence: 0.95,
         direction: "bullish",

@@ -62,7 +62,7 @@ test("MCP paid tool arguments are rejected and normalized before payment", () =>
 test("MCP JSON helpers enforce product and settlement contracts", () => {
   const settlement = {
     success: true,
-    transaction: "0xabc",
+    transaction: `0x${"ab".repeat(32)}`,
     network: "eip155:8453",
   };
   const catalog = parseMcpToolJson<{ tools: unknown[] }>("get_market_catalog", {
@@ -82,7 +82,7 @@ test("MCP JSON helpers enforce product and settlement contracts", () => {
     paymentResponse: settlement,
   });
   assert.equal(carry.data.symbol, "BTC");
-  assert.equal(carry.payment?.transaction, "0xabc");
+  assert.equal(carry.payment?.transaction, `0x${"ab".repeat(32)}`);
 
   assert.throws(() => validateMcpToolResult("get_market_carry", {
     content: [{ type: "text", text: "{}" }],
@@ -181,7 +181,7 @@ test("x402 client accepts only successful, attributable settlement receipts", as
   };
   const settlement = {
     success: true,
-    transaction: "0xabc",
+    transaction: `0x${"ab".repeat(32)}`,
     network: "eip155:8453" as const,
   };
   let failed = false;
@@ -194,7 +194,7 @@ test("x402 client accepts only successful, attributable settlement receipts", as
     }),
   });
   const result = await client.marketCarry("BTC");
-  assert.equal(result.payment?.transaction, "0xabc");
+  assert.equal(result.payment?.transaction, `0x${"ab".repeat(32)}`);
   failed = true;
   await assert.rejects(client.marketCarry("BTC"), /settlement was not successful/);
 });
@@ -414,7 +414,7 @@ test("agent guardrails return HOLD below the confidence threshold", () => {
   const risk = {
     symbol: "BTC",
     news: { items: [{ direction: "bullish", sentiment: 4, confidence: 0.5 }] },
-    funding: { carry: { funding_rate_per_hour: 0.0001 } },
+    funding: { carry: { funding_rate_per_hour: 0.0001 }, freshness: { status: "fresh" } },
     freshness: { status: "fresh" },
   } as unknown as MarketRisk;
   assert.equal(decideFromMarketRisk(risk).side, "HOLD");
@@ -423,8 +423,9 @@ test("agent guardrails return HOLD below the confidence threshold", () => {
 test("agent reads the live x402 news.items schema and normalizes -10..10 sentiment", () => {
   const risk = {
     symbol: "BTC",
-    news: { items: [{ direction: "bullish", sentiment: 8, confidence: 0.95 }] },
-    funding: { carry: { funding_rate_per_hour: 0.0001 } },
+    news: { items: [{ direction: "bullish", sentiment: 8, confidence: 0.95 }], freshness: { status: "fresh" } },
+    liquidations: { freshness: { status: "fresh" } },
+    funding: { carry: { funding_rate_per_hour: 0.0001 }, freshness: { status: "fresh" } },
     freshness: { status: "fresh" },
   } as unknown as MarketRisk;
   const decision = decideFromMarketRisk(risk);
@@ -570,4 +571,51 @@ test("x402 buyer rejects a non-USDC asset even below the price ceiling", async (
       extra: {},
     }],
   }));
+});
+
+
+test("MCP wrapper drops adversarial protocol error messages and data over actual HTTP transport", async () => {
+  const { createServer } = await import("node:http");
+  const { inspect } = await import("node:util");
+  const { OmniMcpClient, OmniMcpProtocolError } = await import("../src/mcp.js");
+  const marker = "FAKE_PROOF_SHOULD_NEVER_ESCAPE_PROTOCOL_ERROR";
+  for (const failure of ["initialize", "tools/list", "tools/call"] as const) {
+    const server = createServer(async (request, response) => {
+      if (request.method !== "POST") { response.writeHead(405).end(); return; }
+      let body = "";
+      for await (const chunk of request) body += String(chunk);
+      const message = JSON.parse(body);
+      if (message.id === undefined) { response.writeHead(202).end(); return; }
+      response.writeHead(200, { "content-type": "application/json" });
+      const result = message.method === failure
+        ? { error: { code: -32603, message: marker, data: { paymentSignature: marker, nested: { authorization: marker } } } }
+        : { result: { protocolVersion: "2025-03-26", capabilities: { tools: {} }, serverInfo: { name: "fixture", version: "1" } } };
+      response.end(JSON.stringify({ jsonrpc: "2.0", id: message.id, ...result }));
+    });
+    await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address() as { port: number };
+    const client = new OmniMcpClient({ url: `http://127.0.0.1:${address.port}/mcp` });
+    try {
+      await assert.rejects(async () => {
+        await client.connect();
+        if (failure === "tools/list") await client.listTools();
+        if (failure === "tools/call") await client.catalog();
+      }, error => {
+        assert(error instanceof OmniMcpProtocolError);
+        assert.equal(error.code, -32603);
+        for (const rendered of [String(error), inspect(error), JSON.stringify(error)]) assert(!rendered.includes(marker));
+        assert.equal((error as Error).cause, undefined);
+        return true;
+      });
+    } finally {
+      await client.close();
+      await new Promise<void>(resolve => server.close(() => resolve()));
+    }
+  }
+  for (const name of ["AbortError", "TimeoutError"]) {
+    const error = new OmniMcpProtocolError("callTool", Object.assign(new Error(marker), { name, data: marker }));
+    assert.equal(error.name, name);
+    assert.equal(error.code, null);
+    assert(!inspect(error).includes(marker));
+  }
 });

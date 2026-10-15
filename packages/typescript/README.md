@@ -1,6 +1,6 @@
 # Omni Terminal TypeScript SDK
 
-Public TypeScript clients for Node.js 20.19+ covering Omni's AI News, enriched analytics, MCP, and x402 products; direct Hyperliquid public REST/WebSocket data; and live-capable Coinbase Advanced Trade and Robinhood Crypto agent examples.
+Public TypeScript clients for Node.js 22.12+ covering Omni's AI News, enriched analytics, MCP, and x402 products; direct Hyperliquid public REST/WebSocket data; and live-capable Coinbase Advanced Trade and Robinhood Crypto agent examples.
 
 The SDK follows the published contracts:
 
@@ -36,7 +36,7 @@ or newer verification/demo commands. The ten-product examples below describe
 current source. Installing the tarball into a consumer project does not install
 repository test commands; use the source checkout for those.
 
-For source development, start at a fresh checkout (Node.js 20.19+):
+For source development, start at a fresh checkout (Node.js 22.12+):
 
 ```bash
 git clone https://github.com/InTheta/omni-universe-sdks.git
@@ -54,7 +54,7 @@ Every `npm run example:*` command loads `.env` when that file exists. Values alr
 
 Start with the [runnable example runbook](docs/examples.md). It lists every command, prerequisite, side effect and termination condition, and includes offline demos for authenticated news, Coinbase and Robinhood.
 
-Node.js 20.19 or newer is required. The examples can also be run directly with Node's env-file support:
+Node.js 22.12 or newer is required. The examples can also be run directly with Node's env-file support:
 
 ```bash
 node --env-file=.env --import tsx examples/rest-api-key.ts
@@ -275,3 +275,21 @@ npm audit --omit=dev
 - Coinbase Agentic Wallet MCP: https://docs.cdp.coinbase.com/agentic-wallet/mcp/quickstart
 - Robinhood Agentic Trading MCP: https://robinhood.com/us/en/support/articles/agentic-trading-overview/
 - Robinhood Crypto Trading API: https://docs.robinhood.com/crypto/trading/
+
+## Verified research and recovery agents
+
+See [research and payment recovery](docs/research-and-payment-recovery.md) for an unsigned live research workflow, explicit testnet paid prerequisites, aggregate/recipient bounds, cancellation, and deterministic recovery evidence. These additions target unreleased 0.8.1 source until the coordinated release.
+
+## Error-handling migration in the source-only v0.8.1 update
+
+HTTP and contract errors no longer expose raw seller response bodies or seller-supplied error text through `message` or `details`. These responses can contain untrusted content, credentials, or reusable payment proofs. Handle the SDK's allowlisted `.code`, HTTP `.status`, and sanitized `.requestId` / `.retryAfter` fields instead of parsing upstream prose or logging response payloads. Unknown seller error codes are omitted. This migration applies when upgrading to this source build; it is not a claim about the currently published v0.8.0 package.
+### MCP protocol errors
+
+`OmniMcpClient` wraps connection, tool-listing, tool-call and close failures in
+`OmniMcpProtocolError`. Only the operation and numeric protocol error code are
+retained; untrusted server messages, data and causes are discarded because they
+may echo payment proofs. Cancellation and timeout error names are preserved.
+An error is not proof that a payment was never settled: reconcile an uncertain
+payment before approving another attempt. This guarantee applies to Omni's
+wrapper; direct use of the raw `@modelcontextprotocol/sdk` client requires its
+own error redaction and must not log arbitrary exception data.

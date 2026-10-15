@@ -39,6 +39,8 @@ try {
     "examples/x402-all-routes.ts",
     "docs/examples.md",
     "docs/trading-agents.md",
+    "docs/guarded-testnet.md",
+    "examples/agents/guarded-execution.ts",
     "README.md",
     "LICENSE",
     "package.json",
@@ -61,7 +63,7 @@ try {
   const smokeTest = `
     import * as sdk from "@omni-terminal/sdk";
     import * as brokers from "@omni-terminal/sdk/brokers";
-    const required = ["OmniClient", "OmniMcpClient", "OmniX402Client", "HyperliquidPublicClient", "HyperliquidWebSocketClient"];
+    const required = ["OmniClient", "OmniMcpClient", "OmniX402Client", "HyperliquidPublicClient", "HyperliquidWebSocketClient", "GuardedTestnetExecutor"];
     for (const name of required) {
       if (typeof sdk[name] !== "function") throw new Error(\`missing root export: \${name}\`);
     }

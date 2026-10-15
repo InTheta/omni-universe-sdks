@@ -1,6 +1,9 @@
-import { ExchangeClient, HttpTransport, InfoClient, TESTNET_API_URL } from "@nktkas/hyperliquid";
-import { formatPrice, formatSize } from "@nktkas/hyperliquid/utils";
+import { GuardedTestnetExecutor, type TestnetJournal } from "@omni-terminal/sdk";
 import { privateKeyToAccount } from "viem/accounts";
+import { mkdir, writeFile, open, rename, unlink, readdir, readFile } from "node:fs/promises";
+import { join, resolve } from "node:path";
+import { HttpTransport, InfoClient, TESTNET_API_URL } from "@nktkas/hyperliquid";
+import { formatPrice, formatSize } from "@nktkas/hyperliquid/utils";
 import {
   HARD_MAX_TESTNET_NOTIONAL_USD,
   MIN_TESTNET_NOTIONAL_USD,
@@ -74,60 +77,34 @@ export class HyperliquidTestnetExecutor {
     }
     const plan = createOrderPlan(intent, await this.market(intent.symbol), config);
     if (!config.enabled) return { mode: "dry-run", intent, plan };
-    return this.placeAndCancel(intent, plan, config);
+    if (!config.privateKey || !config.accountAddress) throw new Error("Dedicated testnet key and explicit owning account required");
+    if (config.orderOffsetBps !== 200) throw new Error("Guarded lifecycle requires explicit 200 bp passive offset");
+    if (!process.env.TESTNET_JOURNAL_DIRECTORY) throw new Error("TESTNET_JOURNAL_DIRECTORY required for durable recovery");
+    const directory = resolve(process.env.TESTNET_JOURNAL_DIRECTORY);
+    await mkdir(directory, { recursive: true, mode: 0o700 });
+    const lock = join(directory, ".execution-lock");
+    await writeFile(lock, "Recover journals before removing this lock", { flag: "wx", mode: 0o600 });
+    if ((await readdir(directory)).some(name => name.endsWith(".json") || name.endsWith(".tmp"))) throw new Error("Recover existing journals before a new run");
+    const persist = async (journal: TestnetJournal) => {
+      const path = join(directory, `${journal.plan.cloid}.json`);
+      const handle = await open(`${path}.tmp`, "wx", 0o600);
+      try { await handle.writeFile(JSON.stringify(journal)); await handle.sync(); } finally { await handle.close(); }
+      await rename(`${path}.tmp`, path);
+      const directoryHandle = await open(directory, "r");
+      try { await directoryHandle.sync(); } finally { await directoryHandle.close(); }
+    };
+    const guarded = new GuardedTestnetExecutor({ accountAddress: config.accountAddress, symbol: config.symbol, maxNotionalUsd: config.maxNotionalUsd, builderFeeTenthsBps: 25, enabled: true, signer: privateKeyToAccount(config.privateKey), persist, loadPendingJournals: async () => Promise.all((await readdir(directory)).filter(name => name.endsWith(".json")).map(async name => JSON.parse(await readFile(join(directory, name), "utf8")) as TestnetJournal)) });
+    const preview = await guarded.preview(intent.side, Math.min(intent.maxNotionalUsd, config.maxNotionalUsd));
+    const journal = await guarded.submit(preview);
+    const final = await guarded.cancel(journal);
+    if (!final.complete || final.fills?.length || final.remainingExposure?.length) throw new Error("Legacy resting-order workflow requires explicit recovery; inspect durable journal");
+    const status = final.status;
+    if (status.status !== "order") throw new Error("Order remains uncertain");
+    await unlink(lock);
+    return { mode: "testnet", intent, plan, orderId: status.order.order.oid, cancelled: true };
   }
 
-  private async placeAndCancel(
-    intent: AgentIntent,
-    plan: TestnetOrderPlan,
-    config: TestnetExecutionConfig,
-  ): Promise<TestnetExecutionResult> {
-    assertTestnetTransport(this.transport);
-    if (!config.privateKey) throw new Error("A Hyperliquid testnet private key is required");
-    const wallet = privateKeyToAccount(config.privateKey);
-    const accountAddress = config.accountAddress ?? wallet.address;
-    const state = await this.info.clearinghouseState({ user: accountAddress });
-    if (Number(state.withdrawable) <= 0) {
-      throw new Error(`Hyperliquid testnet account has no withdrawable collateral: ${accountAddress}`);
-    }
 
-    const exchange = new ExchangeClient({
-      transport: this.transport,
-      wallet,
-      defaultExpiresAfter: () => Date.now() + 30_000,
-    });
-    let orderId: number | undefined;
-    let cancelled = false;
-    try {
-      const placed = await exchange.order({
-        orders: [{
-          a: plan.asset,
-          b: plan.isBuy,
-          p: plan.price,
-          s: plan.size,
-          r: plan.reduceOnly,
-          t: { limit: { tif: plan.tif } },
-        }],
-        grouping: "na",
-      });
-      const status = placed.response.data.statuses[0];
-      if (!status || typeof status !== "object" || !("resting" in status)) {
-        throw new Error(`Expected a resting ALO testnet order, received: ${JSON.stringify(status)}`);
-      }
-      orderId = status.resting.oid;
-      const cancellation = await exchange.cancel({ cancels: [{ a: plan.asset, o: orderId }] });
-      if (cancellation.response.data.statuses[0] !== "success") {
-        throw new Error(`Testnet cancellation failed: ${JSON.stringify(cancellation.response.data.statuses[0])}`);
-      }
-      await waitForOrderClosed(() => this.info.openOrders({ user: accountAddress }), orderId);
-      cancelled = true;
-      return { cancelled: true, intent, mode: "testnet", orderId, plan };
-    } finally {
-      if (orderId !== undefined && !cancelled) {
-        await exchange.cancel({ cancels: [{ a: plan.asset, o: orderId }] }).catch(() => undefined);
-      }
-    }
-  }
 }
 
 export function createOrderPlan(

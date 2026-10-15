@@ -1,3 +1,5 @@
+> Source migration: execution now delegates to the public `GuardedTestnetExecutor` from the sibling SDK source, rather than the old v0.8.0 tarball. Build `packages/typescript` first, then install this example. Exact owner account, a fresh private `TESTNET_JOURNAL_DIRECTORY`, 200 bp offset, flat instrument position and pre-existing Omni builder approval of 25 tenths bp (2.5 bp) are required. Keys stay local. The new guarded guide is `../../packages/typescript/docs/guarded-testnet.md`. No older release is claimed to export this API.
+
 # Omni Hyperliquid testnet agents
 
 Runnable Node.js 22 examples for guarded agent decisions and Hyperliquid testnet execution. The package has no configurable Hyperliquid API URL: every market-data, signing, order, and cancel request is pinned to `https://api.hyperliquid-testnet.xyz` and fails closed if that boundary changes.
@@ -17,6 +19,8 @@ All agents are dry-run by default and convert signals below `TESTNET_MIN_CONFIDE
 ## Install and run
 
 ```bash
+npm --prefix ../../packages/typescript ci
+npm --prefix ../../packages/typescript run build
 npm ci
 cp .env.example .env
 npm run verify:live
@@ -42,6 +46,7 @@ Create or approve a dedicated API wallet on Hyperliquid testnet, fund the owning
 ```dotenv
 HL_TESTNET_PRIVATE_KEY=0x...
 HL_TESTNET_ACCOUNT_ADDRESS=0x...
+TESTNET_JOURNAL_DIRECTORY=/absolute/private/new-session
 RUN_TESTNET_ORDERS=true
 CONFIRM_TESTNET_ORDER=HYPERLIQUID_TESTNET_ONLY
 TESTNET_MAX_NOTIONAL_USD=15
@@ -60,3 +65,12 @@ For GitHub Actions, configure `HL_TESTNET_PRIVATE_KEY` and optionally `HL_TESTNE
 Hyperliquid's testnet faucet requires the same address to have deposited on mainnet before it can claim mock USDC. See the [official testnet faucet instructions](https://hyperliquid.gitbook.io/hyperliquid-docs/onboarding/testnet-faucet) and [official API network documentation](https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api).
 
 Never reuse a mainnet private key. These examples are integration demonstrations, not profitable strategies or investment advice.
+
+## Local guarded MCP agent
+
+See [MCP trading and recovery](MCP_TRADING.md) for the separate stdio adapter,
+public SDK prerequisite, exact policy, permission probe, execution opt-in and
+journal recovery. The deployed `/api/x402/mcp` remains read-only; paying for data
+never grants trading authority. Current live proof covers read-only integration
+and a disabled-execution denial. Filled MCP lifecycle and builder attribution
+require a dedicated approved testnet signer and existing builder approval.

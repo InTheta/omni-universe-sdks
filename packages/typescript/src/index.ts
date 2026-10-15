@@ -9,3 +9,5 @@ export * from "./rest.js";
 export * from "./types.js";
 export * from "./ws.js";
 export * from "./x402.js";
+
+export * from "./guarded-testnet.js";
