@@ -40,6 +40,8 @@ try {
     "docs/examples.md",
     "docs/trading-agents.md",
     "docs/guarded-testnet.md",
+    "docs/builder-attribution.md",
+    "examples/agents/builder-attribution-readonly.mjs",
     "examples/agents/guarded-execution.ts",
     "README.md",
     "LICENSE",
@@ -58,6 +60,54 @@ try {
   mkdirSync(consumer);
   writeFileSync(join(consumer, "package.json"), JSON.stringify({ private: true, type: "module" }));
   run(npm, ["install", "--ignore-scripts", "--no-audit", "--no-fund", tarball], consumer);
+
+  // The consumer installs ONLY the packed SDK. Declaration dependencies must
+  // arrive transitively; repository devDependencies cannot mask broken types.
+  const consumerTypes = `
+    import {
+      GuardedTestnetExecutor, OmniX402Client, OmniWebSocketClient,
+      HyperliquidWebSocketClient,
+      type OmniWebSocketOptions, type HyperliquidWebSocketOptions,
+      type RecentReconciliationOptions, type RecentReconciliationReport,
+    } from "@omni-terminal/sdk";
+    import { CoinbaseAdvancedTradeClient, RobinhoodCryptoClient } from "@omni-terminal/sdk/brokers";
+
+    export function recent(executor: GuardedTestnetExecutor, options: RecentReconciliationOptions): Promise<RecentReconciliationReport> {
+      return executor.recentReconciliation(options);
+    }
+    export function coverage(report: RecentReconciliationReport): void {
+      const fullLedger: false = report.fullLedgerReconciled;
+      const net: string | null = report.totals.realizedNetCashPnlUsdc;
+      const builder: "unverified" = report.limits.builderCredit;
+      void [fullLedger, net, builder];
+    }
+    export function sockets(news: OmniWebSocketOptions, market: HyperliquidWebSocketOptions) {
+      return [new OmniWebSocketClient(news), new HyperliquidWebSocketClient(market)];
+    }
+    export const products = [
+      OmniX402Client.prototype.marketSnapshot,
+      OmniX402Client.prototype.liquidationLevelsScreenshot,
+      OmniX402Client.prototype.liquidationBucketScreenshot,
+      OmniX402Client.prototype.traderProfileScreenshot,
+    ];
+    export type BrokerClients = CoinbaseAdvancedTradeClient | RobinhoodCryptoClient;
+    // @ts-expect-error Internal collectors must not leak through the public API.
+    import { collectRecentReconciliation } from "@omni-terminal/sdk";
+    void collectRecentReconciliation;
+  `;
+  writeFileSync(join(consumer, "public-types.mts"), consumerTypes);
+  writeFileSync(join(consumer, "tsconfig.json"), JSON.stringify({
+    compilerOptions: {
+      strict: true, noEmit: true, skipLibCheck: false,
+      target: "ES2022", module: "NodeNext", moduleResolution: "NodeNext",
+    },
+    files: ["public-types.mts"],
+  }));
+  const consumerManifest = JSON.parse(readFileSync(join(consumer, "package.json"), "utf8")) as {dependencies?: Record<string, string>; devDependencies?: unknown};
+  assert.deepEqual(Object.keys(consumerManifest.dependencies ?? {}), [packageMetadata.name], "consumer must install only the SDK");
+  assert.equal(consumerManifest.devDependencies, undefined, "consumer must not add ambient types");
+  run(process.execPath, [join(packageRoot, "node_modules", "typescript", "bin", "tsc"), "--project", "tsconfig.json"], consumer);
+  console.log("Strict NodeNext packed-consumer declarations passed (skipLibCheck=false, SDK-only install)");
 
   const expectedVersion = JSON.stringify(packageMetadata.version);
   const smokeTest = `

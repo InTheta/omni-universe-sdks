@@ -14,7 +14,7 @@ export type OmniMcpToolName =
   | "get_market_carry"
   | "get_premarket_roundup";
 
-export const SDK_VERSION = "0.8.1";
+export const SDK_VERSION = "0.8.2";
 
 export interface OmniMcpMarketCatalog {
   service: "omni-market-intelligence";
