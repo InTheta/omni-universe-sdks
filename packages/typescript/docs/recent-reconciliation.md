@@ -100,4 +100,3 @@ npm run build
 Fixtures verify arithmetic, rebates, funding signs, fee-token separation,
 pagination boundaries, truncation, duplicate conflicts and request failures.
 They are deterministic tests, not funded execution or full-ledger proof.
-

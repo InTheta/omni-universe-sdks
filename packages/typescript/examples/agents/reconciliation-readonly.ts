@@ -25,4 +25,3 @@ try {
 } finally {
   process.removeListener("SIGINT", abort); process.removeListener("SIGTERM", abort);
 }
-

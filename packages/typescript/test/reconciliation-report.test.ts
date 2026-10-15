@@ -132,4 +132,3 @@ test("whole-report deadline bounds stalled scope reads and external cancel stops
     });
   } finally {clearTimeout(abort);}
 });
-
