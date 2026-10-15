@@ -5,28 +5,21 @@ This is a **client-side stdio server**, separate from Omni's deployed read-only
 stay in the local process. An x402 payment, API key, or research result does not
 supply trading authority or approve a builder fee.
 
-## Source prerequisite and clean installation
+## v0.8.1 prerequisite and clean installation
 
-The guarded export is a source change and must ship before these commands can
-use a published package. Until then, build and install the reviewed SDK tarball
-from this same repository; do not assume v0.8.0 contains this export. Node 22.12+
-required. Run on Linux:
+The guarded API is included in coordinated v0.8.1 and is absent from historical v0.8.0. This repository example depends on the matching sibling SDK through a local package dependency. Build that SDK before installing the adapter. Node >=22.12 is required. For an external consumer use the v0.8.1 tagged archive once published; see the [release notes](../../packages/typescript/docs/releases/0.8.1.md). Run on Linux:
 
 ```bash
 cd packages/typescript
 npm ci
 npm run build
-npm pack
 cd ../../examples/testnet-agents
 npm ci
-npm install --no-save --package-lock=false ../../packages/typescript/omni-terminal-sdk-0.8.1.tgz
 npm run typecheck
 npm run test:mcp
 ```
 
-The source example currently requires that explicit local tarball override.
-After a release, update the example lockfile to the immutable released artifact
-before presenting `npm ci` alone as sufficient.
+For a clean external package-boundary check, `npm pack` the SDK and install that generated archive in a new consumer directory. The repository adapter intentionally keeps its local sibling dependency, so it must be used with the same reviewed source revision.
 
 ## Public testnet data and permission checks (zero cost)
 
@@ -45,7 +38,7 @@ export OMNI_TESTNET_MCP_JOURNAL=/absolute/operator-owned/path/testnet-mcp.json
 npm run agent:mcp -- --permission-check
 ```
 
-Expected: eight tools, live exact instrument/book and account data, a structured
+Expected with the v0.8.1 SDK: nine tools (eight core lifecycle tools plus the read-only `recent_reconciliation`), live exact instrument/book and account data, a structured
 preview, `TESTNET_EXECUTION_DISABLED`, `mode: integration-tested`, zero real funds
 spent. This proves a permission denial, not an executed lifecycle. It neither
 loads a signer nor issues exchange writes. The denied plan is permanently
@@ -122,10 +115,10 @@ that cannot change this startup policy.
   available. Do not describe fixture results as sandbox fills.
 
 
-## Read-only recent execution accounting (unreleased source)
+## Read-only recent execution accounting in v0.8.1
 
-When backed by the SDK source containing `recentReconciliation`, this local adapter also advertises `recent_reconciliation`. Its inputs are explicit inclusive `startTime`/`endTime` in Unix milliseconds (at most seven days), optional expected order IDs, a maximum 4–16 total requests and a 20-second default deadline. Account, instrument, network, signer, builder and fee policy remain fixed at server startup. The tool forwards MCP cancellation to the read-only SDK call and needs no signer or execution opt-in.
+When backed by v0.8.1 containing `recentReconciliation`, this local adapter also advertises `recent_reconciliation`. Its inputs are explicit inclusive `startTime`/`endTime` in Unix milliseconds (at most seven days), optional expected order IDs, a maximum 4–16 total requests and a 20-second default deadline. Account, instrument, network, signer, builder and fee policy remain fixed at server startup. The tool forwards MCP cancellation to the read-only SDK call and needs no signer or execution opt-in.
 
 Call `recent_reconciliation` with the exact recent window after a lifecycle. Inspect `expectedOrders.missing`, both source coverage/gap objects, observed fills and current exposure before drawing conclusions. `fullLedgerReconciled` is always false because upstream retention is unverified. Totals cover all observed fills/funding in the configured instrument-period; expected order IDs do not narrow those totals. Funding is not attributed to an individual order, builder fees are a subset of total fees, unrealized PnL is a separate current snapshot, and builder credit remains unverified. This tool creates no order and never retries a trade.
 
-This API is source-only and is not present in the published v0.8.0 archive. Test the SDK and adapter from the same reviewed source revision.
+This API is absent from the historical v0.8.0 archive. Use the SDK and adapter from the same reviewed v0.8.1 revision.

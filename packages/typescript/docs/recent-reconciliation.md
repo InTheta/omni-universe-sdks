@@ -1,8 +1,6 @@
 # Recent testnet execution, fee and funding reconciliation
 
-This source-only capability is not present in the existing published v0.8.0 SDK.
-Use the reviewed source tarball until a release explicitly includes
-`GuardedTestnetExecutor.recentReconciliation`. Run on Linux with Node 22.12+:
+`GuardedTestnetExecutor.recentReconciliation` is included in the coordinated v0.8.1 release and is absent from historical v0.8.0. Use the tagged v0.8.1 archive once published or build the matching reviewed source; see the [release notes](releases/0.8.1.md). Run on Linux with Node >=22.12:
 
 ```sh
 cd packages/typescript

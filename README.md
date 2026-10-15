@@ -8,14 +8,14 @@ Public SDKs, connection examples, market-data integrations, and guarded trading-
 
 | SDK | Status | Runtime | Coverage |
 | --- | --- | --- | --- |
-| [TypeScript](packages/typescript) | Source `0.8.1` (unreleased) | Node.js 22.12+ | Omni API-key REST/WS, x402 REST, x402 MCP, direct Hyperliquid REST/WS, Coinbase and Robinhood agent examples |
+| [TypeScript](packages/typescript) | `0.8.1` coordinated release | Node.js 22.12+ | Omni API-key REST/WS, x402 REST, x402 MCP, direct Hyperliquid REST/WS, Coinbase and Robinhood agent examples |
 
 The TypeScript package is source-available here and produces `@omni-terminal/sdk`. Publishing to the npm registry is a separate release step and has not been performed yet.
 
-Install the latest published and verified release, `v0.8.0`, directly from GitHub until npm publication is complete. Clone `main` to use the unreleased `0.8.1` examples and runbook:
+Install the coordinated `v0.8.1` GitHub release artifact once its tagged archive is published. If that archive is not available yet, build the reviewed source as described below; npm registry publication is separate. See the [v0.8.1 release and migration notes](packages/typescript/docs/releases/0.8.1.md).
 
 ```bash
-npm install https://github.com/InTheta/omni-universe-sdks/releases/download/v0.8.0/omni-terminal-sdk-0.8.0.tgz
+npm install https://github.com/InTheta/omni-universe-sdks/releases/download/v0.8.1/omni-terminal-sdk-0.8.1.tgz
 ```
 
 ## Connection model
@@ -40,6 +40,8 @@ Public Hyperliquid reads go directly to Hyperliquid. Omni API keys are used only
 | [Agentic trading zero-to-one](packages/typescript/docs/agentic-trading-0-to-1.md) | Coinbase Agentic Wallet x402 discovery/payment, Omni evidence, Robinhood Trading MCP, and runnable broker adapters |
 | [Ask Omni research bundles](packages/typescript/docs/ask-omni-bundles.md) | Agentic Market-style 0.120-0.144 USDC recipes combining the published roundup, live MCP tools, HTTP products, receipts, and broker handoff |
 | [Hyperliquid testnet agents](examples/testnet-agents/README.md) | Momentum, mean-reversion and Omni risk agents with a capped place/verify/cancel lifecycle |
+| [Guarded testnet lifecycle](packages/typescript/docs/guarded-testnet.md) | Exact account/instrument policy, durable recovery and builder prerequisites |
+| [Recent reconciliation](packages/typescript/docs/recent-reconciliation.md) | Bounded read-only fills, fees and funding with explicit retention gaps |
 | [Security policy](SECURITY.md) | Private reporting and production credential guidance |
 
 ## Examples

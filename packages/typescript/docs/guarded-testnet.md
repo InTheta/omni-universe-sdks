@@ -1,8 +1,8 @@
 # Guarded Hyperliquid testnet execution
 
-This API is source-only until an SDK release containing `GuardedTestnetExecutor` is published. The existing v0.8.0 release does **not** export it. Do not install v0.8.0 and expect these commands to work.
+`GuardedTestnetExecutor` is included in the coordinated v0.8.1 release. Install its tagged archive or build the matching source revision; publication availability is described in the [release notes](releases/0.8.1.md). Historical v0.8.0 does **not** export this API.
 
-Migration: this source-only v0.8.1 API requires Node >=22.12 (the pinned execution dependency raises the previous Node >=20.19 minimum). Existing v0.8.0 consumers retain their published runtime contract. Upgrade Node before consuming this source build.
+Migration: v0.8.1 requires Node >=22.12; the execution dependency raises the previous Node >=20.19 minimum. Historical v0.8.0 consumers retain their published runtime contract. Upgrade Node before upgrading the SDK.
 
 From this source revision on Linux with Node >=22.12:
 
@@ -59,4 +59,4 @@ Cancellation uses authoritative order status and current exact-symbol asset meta
 
 The example runner reports success and removes its session lock only after complete reconciliation and flat final exposure. A filled status without indexed fills, unexplained exposure, incomplete cleanup or missing reconciliation fields preserves the lock and journals. Restore visibility and reconcile those same journals before a new entry.
 
-Current scope does not include amendment/cancel-replace, vault/subaccount execution, or a funding/PnL ledger. Returned order-fill fee fields are not a complete account ledger or proof of builder credit. Funded execution and authoritative builder-export reconciliation remain separate verification requirements.
+Current execution scope does not include amendment/cancel-replace or vault/subaccount execution. The separate [recent reconciliation report](recent-reconciliation.md) summarizes observed instrument-period fills, fees and funding; it is not a complete account ledger or proof of builder credit. Funded execution and authoritative builder-export reconciliation remain separate verification requirements.
