@@ -19,13 +19,13 @@ Private deployment addresses are deliberately not embedded. Override the public 
 
 ## Install
 
-Use the v0.8.3 GitHub release archive once its tagged asset is published. If the archive is not available yet, use the source build below. npm registry publication is a separate release step. Read the [v0.8.3 recovery/example fixes](docs/releases/0.8.3.md), [v0.8.2 packaging fix](docs/releases/0.8.2.md) and [v0.8.1 feature/runtime migration](docs/releases/0.8.1.md) before upgrading.
+Use the v0.8.4 GitHub release archive once its tagged asset is published. If the archive is not available yet, use the source build below. npm registry publication is a separate release step. Read the [v0.8.4 payment error-code fix](docs/releases/0.8.4.md), [v0.8.3 recovery/example fixes](docs/releases/0.8.3.md), [v0.8.2 packaging fix](docs/releases/0.8.2.md) and [v0.8.1 feature/runtime migration](docs/releases/0.8.1.md) before upgrading.
 
 ```bash
-npm install https://github.com/InTheta/omni-universe-sdks/releases/download/v0.8.3/omni-terminal-sdk-0.8.3.tgz
+npm install https://github.com/InTheta/omni-universe-sdks/releases/download/v0.8.4/omni-terminal-sdk-0.8.4.tgz
 ```
 
-These public contract versions were checked on 15 October 2026 and are separate from SDK package v0.8.3. The live schema and unpaid payment challenge take precedence over a version or price recorded in this guide.
+These public contract versions were checked on 15 October 2026 and are separate from SDK package v0.8.4. The live schema and unpaid payment challenge take precedence over a version or price recorded in this guide.
 
 The v0.8.0 artifact contains nine JSON product helpers and does not include
 `premarketRoundup()`, `premarketRoundupData()`, the forced-free `:free` scripts,
@@ -33,7 +33,7 @@ or newer verification/demo commands. The thirteen-product HTTP examples below de
 v0.8.1, including the three PNG helpers. Installing the tarball into a consumer project does not install
 repository test commands; use the source checkout for those.
 
-For SDK-only consumers, follow the [installed archive quickstarts](docs/installed-quickstarts.md). v0.8.3 includes compiled JavaScript under `dist-examples/`; these entry points need no `tsx` or TypeScript compiler. Source-only tests and the local stdio MCP trading adapter require the separate tagged repository installation.
+For SDK-only consumers, follow the [installed archive quickstarts](docs/installed-quickstarts.md). v0.8.4 includes compiled JavaScript under `dist-examples/`; these entry points need no `tsx` or TypeScript compiler. Source-only tests and the local stdio MCP trading adapter require the separate tagged repository installation.
 
 For source development, start at a fresh checkout (Node.js 22.12+):
 

@@ -1,12 +1,12 @@
 # Run agents from the installed SDK archive
 
-Node >=22.12 on Linux is required. After the v0.8.3 release asset is published, create a fresh consumer directory:
+Node >=22.12 on Linux is required. After the v0.8.4 release asset is published, create a fresh consumer directory:
 
 ```sh
 mkdir omni-sdk-consumer
 cd omni-sdk-consumer
 npm init -y
-npm install --ignore-scripts https://github.com/InTheta/omni-universe-sdks/releases/download/v0.8.3/omni-terminal-sdk-0.8.3.tgz
+npm install --ignore-scripts https://github.com/InTheta/omni-universe-sdks/releases/download/v0.8.4/omni-terminal-sdk-0.8.4.tgz
 SDK=node_modules/@omni-terminal/sdk
 ```
 
@@ -64,7 +64,7 @@ The separate compiled `payment-recovery.js` example uses a public deterministic 
 The separate local stdio MCP trading adapter, its client and test suites are repository examples, **not included in the SDK tarball**. Use the matching tagged source when that path is needed:
 
 ```sh
-git clone --branch v0.8.3 https://github.com/InTheta/omni-universe-sdks.git
+git clone --branch v0.8.4 https://github.com/InTheta/omni-universe-sdks.git
 cd omni-universe-sdks/packages/typescript
 npm ci
 npm run build
@@ -74,13 +74,13 @@ npm run typecheck
 npm run test:mcp
 ```
 
-Then follow [MCP trading and recovery](https://github.com/InTheta/omni-universe-sdks/blob/v0.8.3/examples/testnet-agents/MCP_TRADING.md) for the exact owner/symbol, private journal path and `RUN_TESTNET_MCP_TRADING=false` permission probe. Source `verify:live` also includes a separately labelled signed unfunded-account probe; it is not an unsigned-only quickstart. Trading through this local adapter still requires independently approved testnet authority, builder approval and funded collateral. The paid seller MCP server does not become a trading server.
+Then follow [MCP trading and recovery](https://github.com/InTheta/omni-universe-sdks/blob/v0.8.4/examples/testnet-agents/MCP_TRADING.md) for the exact owner/symbol, private journal path and `RUN_TESTNET_MCP_TRADING=false` permission probe. Source `verify:live` also includes a separately labelled signed unfunded-account probe; it is not an unsigned-only quickstart. Trading through this local adapter still requires independently approved testnet authority, builder approval and funded collateral. The paid seller MCP server does not become a trading server.
 
 Repository `test/*.ts`, including full guarded-executor and payment-policy regression suites, are omitted from the public SDK archive. Run them from the tagged source after `npm ci`; do not point an installed-package user at missing test files. The archive's unsigned lifecycle runner above remains available without a source checkout.
 
 ## Troubleshooting
 
-- `Cannot find package 'tsx'`: a historical release's source-only example command was selected. Use the v0.8.3 compiled paths above; do not add unrelated consumer dependencies to disguise a packaging failure.
+- `Cannot find package 'tsx'`: a historical release's source-only example command was selected. Use the v0.8.4 compiled paths above; do not add unrelated consumer dependencies to disguise a packaging failure.
 - `dist-examples/...` missing: confirm the installed release and archive contents. For a source checkout run its documented build before examples.
 - `Set exact ...` or an invalid-symbol error: supply the precise public account/instrument; do not substitute another account.
 - `TESTNET_EXECUTION_DISABLED` in the permission probe is the expected safe result.

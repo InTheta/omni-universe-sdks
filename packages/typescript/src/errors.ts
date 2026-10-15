@@ -1,3 +1,5 @@
+import { decodePaymentRequiredHeader } from "@x402/core/http";
+
 /** Error metadata is deliberately allowlisted: untrusted response bodies can echo credentials. */
 function safeRequestId(value: string | null): string | null {
   if (!value) return null;
@@ -12,6 +14,11 @@ function safeRetryAfter(value: string | null): string | null {
 const PUBLIC_ERROR_CODES = new Set([
   "insufficient_funds", "invalid_exact_evm_payload_authorization_valid_after",
   "invalid_exact_evm_payload_authorization_valid_before", "invalid_exact_evm_payload_authorization_value_mismatch",
+  // Canonical reasons from the pinned official EVM verifiers (2.18 and 2.20).
+  "asset_not_deployed_contract", "invalid_exact_evm_scheme", "invalid_exact_evm_network_mismatch",
+  "invalid_exact_evm_missing_eip712_domain", "invalid_exact_evm_signature", "invalid_exact_evm_recipient_mismatch",
+  "invalid_exact_evm_nonce_already_used", "invalid_exact_evm_insufficient_balance", "invalid_exact_evm_transaction_simulation_failed",
+  // Preserve previously exposed names for compatibility with older/custom sellers.
   "invalid_exact_evm_payload_signature", "invalid_exact_evm_payload_recipient_mismatch", "invalid_network",
   "invalid_payload", "invalid_payment_requirements", "invalid_scheme", "unsupported_scheme", "invalid_x402_version",
   "invalid_transaction_state", "unexpected_verify_error", "unexpected_settle_error", "invalid_request",
@@ -24,6 +31,20 @@ function safeErrorCode(body: unknown): string {
     if (typeof candidate === "string" && PUBLIC_ERROR_CODES.has(candidate)) return candidate;
   }
   return "HTTP_ERROR";
+}
+
+function safePaymentRequiredError(response: Response): string {
+  if (response.status !== 402) return "HTTP_ERROR";
+  const header = response.headers.get("payment-required");
+  // Bound work before decoding untrusted base64/JSON. Never retain the decoded challenge.
+  if (!header || header.length > 16 * 1024) return "HTTP_ERROR";
+  try {
+    const challenge = decodePaymentRequiredHeader(header);
+    return challenge.x402Version === 2 && typeof challenge.error === "string" && PUBLIC_ERROR_CODES.has(challenge.error)
+      ? challenge.error : "HTTP_ERROR";
+  } catch {
+    return "HTTP_ERROR";
+  }
 }
 
 export class OmniApiError extends Error {
@@ -41,7 +62,9 @@ export class OmniApiError extends Error {
     super(message);
     this.name = "OmniApiError";
     this.status = status;
-    this.code = safeErrorCode(_details);
+    // Existing recognized body codes take precedence; v2 verification failures use a header and empty body.
+    const bodyCode = safeErrorCode(_details);
+    this.code = bodyCode !== "HTTP_ERROR" ? bodyCode : safePaymentRequiredError(response);
     this.requestId = safeRequestId(response.headers.get("x-request-id"));
     this.retryAfter = safeRetryAfter(response.headers.get("retry-after"));
     this.details = { code: this.code, status, responseBodyRedacted: true };
