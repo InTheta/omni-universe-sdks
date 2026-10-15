@@ -51,9 +51,9 @@ The `:public` and `:free` commands override payment and API-key flags from `.env
 | `npm run example:news-ws:demo` | No | No | No | No | No | One deterministic frame, then exits |
 | `npm run example:news-ws` | Yes | `OMNI_API_KEY` | No x402 payment | No | No | Five authenticated news frames, then exits |
 | `npm run example:x402:free` | Yes | No | No | No | No | Two free health contracts, then exits |
-| `npm run example:x402` | Yes | Buyer key only when paid mode is enabled | Only with `RUN_PAID_EXAMPLES=true` | No | No | Free health or all ten paid JSON products, then exits |
+| `npm run example:x402` | Yes | Buyer key only when paid mode is enabled | Only with `RUN_PAID_EXAMPLES=true` | No | No | Free health or 13 paid HTTP products; explicit Sepolia confirmation required |
 | `npm run example:mcp:free` | Yes | No | No | No | No | Free MCP catalog, then exits |
-| `npm run example:mcp` | Yes | Buyer key only when paid mode is enabled | Only with `RUN_PAID_EXAMPLES=true` | No | No | Free catalog or five paid tools, then exits |
+| `npm run example:mcp` | Yes | Buyer key only when paid mode is enabled | Only with `RUN_PAID_EXAMPLES=true` | No | No | Free catalog or five paid tools; explicit Sepolia confirmation required |
 | `npm run example:ask-omni:demo` | No | No | No | No | No | Prints the current 0.120-0.144 USDC plan; paid mode preflights the preserved 0.030 total/0.010 per-call defaults and rejects before work |
 | `npm run example:ask-omni` | Yes | Dedicated buyer key | Only with `RUN_PAID_ASK_OMNI_BUNDLE=yes` | No | No | Executes one bounded brief/deep/visual research bundle |
 | `npm run example:coinbase:demo` | No | No | No | Mocked preview | No | Deterministic BUY and preview, then exits |
@@ -74,26 +74,38 @@ npm run example:news-ws
 
 ## Paid x402 REST and MCP
 
-Use a separate buyer wallet with only the funds you intend to spend:
+Use a separate Base Sepolia buyer wallet. Both examples stay free by default.
+The 13-product HTTP plan totals at most 0.182 test USDC; the five-tool MCP plan
+totals at most 0.124. Each allows at most 0.100 per call for published premarket
+research. The generic SDK default remains 0.010 and is not raised by discovery.
+
+After independently approving one exact plan, configure the protected environment:
 
 ```dotenv
 EVM_PRIVATE_KEY=0x...
-X402_MAX_PAYMENT_USD=0.01
-X402_MAX_RESEARCH_SESSION_USD=0.013
 RUN_PAID_EXAMPLES=true
+X402_CONFIRM_TESTNET_BUDGET=0.182
+X402_BUCKET_PRICE=<current published liquidation level>
+X402_RUN_STATE=<new private journal path>
 ```
 
-Then choose one transport:
+Run `npm run example:x402` for exactly 13 HTTP products (ten JSON and three PNG).
+For `npm run example:mcp`, instead confirm `X402_CONFIRM_TESTNET_BUDGET=0.124` and
+use a different new journal path; the bucket price is not needed. A dated roundup
+is a query variant, not an additional product purchase in either matrix.
 
-```bash
-# Purchases each of the ten JSON REST products once.
-npm run example:x402
+These examples pin Base Sepolia, canonical USDC and Omni's receiver through the
+payment policy. They reserve aggregate authorization budgets before signing,
+limit authorization counts to 13 or five, record request starts and returned
+receipt identifiers in exclusive mode-0600 journals, and stop on failures.
+They do not implement restart/resume or prove settlement exactly once. Reconcile
+the existing journal and chain state before any separately approved new run.
+Never blindly rerun with a new journal to reset an uncertain budget. No private
+key, signed proof or raw MCP envelope is logged. The protected payer is local to
+the process; no key enters the seller service.
 
-# Purchases each of the five paid MCP tools once.
-npm run example:mcp
-```
-
-The payment client enforces the configured per-call ceiling. Remove `RUN_PAID_EXAMPLES=true` immediately after the run. Use the `:free` commands to inspect discovery and health contracts without relying on the contents of `.env`.
+Remove `RUN_PAID_EXAMPLES=true` after the run. The `:free` commands override it
+and perform only free health/catalog reads without constructing a payer.
 
 ## Coinbase and Robinhood agents
 
