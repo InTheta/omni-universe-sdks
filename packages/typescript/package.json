@@ -25,7 +25,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.examples.json --noEmit",
-    "test": "node --import tsx --test test/unit.test.ts test/boundary.test.ts test/agents.test.ts test/bundle-budget.test.ts test/x402-hardening.test.ts test/guarded-testnet.test.ts test/guarded-rejection.test.ts test/error-redaction.test.ts test/screenshots.test.ts test/guarded-runner.test.ts test/reconciliation-report.test.ts test/builder-attribution.test.ts",
+    "test": "npm run build && node --import tsx --test test/unit.test.ts test/boundary.test.ts test/agents.test.ts test/bundle-budget.test.ts test/x402-hardening.test.ts test/guarded-testnet.test.ts test/guarded-rejection.test.ts test/error-redaction.test.ts test/screenshots.test.ts test/guarded-runner.test.ts test/reconciliation-report.test.ts test/builder-attribution.test.ts",
     "test:agents": "node --import tsx --test test/agents.test.ts",
     "test:examples": "npm run example:news-ws:demo && npm run example:agentic-flow:demo && npm run example:ask-omni:demo && npm run example:coinbase:demo && npm run example:robinhood:demo",
     "test:live": "node --import tsx --test test/live.test.ts",
@@ -33,7 +33,7 @@
     "test:docs": "tsx scripts/verify-docs.ts ../..",
     "test:package": "tsx scripts/verify-package.ts",
     "pack:check": "npm pack --dry-run --json",
-    "verify": "npm run typecheck && npm test && npm run build && npm run test:examples && npm run test:boundary && npm run test:docs && npm run test:package && npm audit --omit=dev",
+    "verify": "npm run typecheck && npm test && npm run test:examples && npm run test:boundary && npm run test:docs && npm run test:package && npm audit --omit=dev",
     "verify:live": "npm run verify && npm run example:rest:public && npm run example:ws && npm run example:x402:free && npm run example:mcp:free && npm run test:live && npm run pack:check",
     "example:rest": "node --env-file-if-exists=.env --import tsx examples/rest-api-key.ts",
     "example:rest:public": "node --env-file-if-exists=.env --import tsx examples/rest-api-key.ts --public-only",
