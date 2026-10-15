@@ -22,7 +22,7 @@
   },
   "dependencies": {
     "@nktkas/hyperliquid": "0.33.3",
-    "@omni-terminal/sdk": "https://github.com/InTheta/omni-universe-sdks/releases/download/v0.8.0/omni-terminal-sdk-0.8.0.tgz",
+    "@omni-terminal/sdk": "file:../../packages/typescript",
     "viem": "2.55.10"
   },
   "devDependencies": {

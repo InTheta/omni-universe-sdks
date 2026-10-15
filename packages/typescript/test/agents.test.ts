@@ -10,7 +10,7 @@ test("public example commands load an optional .env file on the supported Node f
     await readFile(new URL("../package.json", import.meta.url), "utf8"),
   ) as { engines: { node: string }; scripts: Record<string, string> };
 
-  assert.equal(packageJson.engines.node, ">=20.19");
+  assert.equal(packageJson.engines.node, ">=22.12");
   const exampleCommands = Object.entries(packageJson.scripts)
     .filter(([name]) => name.startsWith("example:"));
   assert.ok(exampleCommands.length > 0);
