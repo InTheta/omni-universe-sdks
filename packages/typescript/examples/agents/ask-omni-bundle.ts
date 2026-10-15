@@ -1,8 +1,9 @@
 import { wrapFetchWithPayment } from "@x402/fetch";
+import { x402HTTPClient } from "@x402/core/client";
 import {
   BundleBudget, createAskOmniBundlePlan, createEvmPaymentClient,
   OmniMcpClient, OmniX402Client,
-  type AskOmniBundleTier, type X402Symbol,
+  validatePaymentSettlement, type AskOmniBundleTier, type X402Symbol,
 } from "@omni-terminal/sdk";
 
 const args = new Set(process.argv.slice(2));
@@ -41,7 +42,14 @@ const result = await budget.execute("ask-omni-cli", plan, async (step) => {
     if (step.transport === "mcp+x402") await mcp.connect();
     const value = await (async (): Promise<unknown> => {
       switch (step.id) {
-        case "resolve_entities": return mcp.resolveEntitiesData([mention!]);
+        case "resolve_entities": {
+          const resolved = await mcp.resolveEntitiesData([mention!]);
+          const match = resolved.data.results[0];
+          if (resolved.data.results.length !== 1 || match?.resolution_status !== "resolved" || !match.product_supported || match.base?.toUpperCase() !== symbol) {
+            throw new Error("Market mention did not resolve unambiguously to the selected supported symbol");
+          }
+          return resolved;
+        }
         case "published_roundup": return mcp.premarketRoundupData(1);
         case "moving_events": return mcp.marketMovingEventsData({ symbol, market: "crypto", limit: 5, event_window_minutes: 60 });
         case "market_risk": return mcp.marketRiskData({ symbol, scope: "current", event_window_minutes: 60, limit: 5 });
@@ -51,6 +59,8 @@ const result = await budget.execute("ask-omni-cli", plan, async (step) => {
         case "liquidation_visual": {
           const response = await wrapFetchWithPayment(globalThis.fetch, paymentClient)(`${baseUrl}${step.resource}`);
           if (!response.ok || !response.headers.has("payment-response")) throw new Error("Visual payment/result was not confirmed");
+          const receipt = new x402HTTPClient(paymentClient).getPaymentSettleResponse((name) => response.headers.get(name));
+          validatePaymentSettlement(step.resource!, receipt);
           const bytes = new Uint8Array(await response.arrayBuffer());
           if (!response.headers.get("content-type")?.startsWith("image/png") || bytes.length < 8 || bytes[0] !== 0x89 || bytes[1] !== 0x50) throw new Error("Visual route did not return PNG");
           return { contentType: "image/png", bytes: bytes.length };
