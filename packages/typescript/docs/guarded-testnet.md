@@ -60,3 +60,5 @@ Cancellation uses authoritative order status and current exact-symbol asset meta
 The example runner reports success and removes its session lock only after complete reconciliation and flat final exposure. A filled status without indexed fills, unexplained exposure, incomplete cleanup or missing reconciliation fields preserves the lock and journals. Restore visibility and reconcile those same journals before a new entry.
 
 Current execution scope does not include amendment/cancel-replace or vault/subaccount execution. The separate [recent reconciliation report](recent-reconciliation.md) summarizes observed instrument-period fills, fees and funding; it is not a complete account ledger or proof of builder credit. Funded execution and authoritative builder-export reconciliation remain separate verification requirements.
+
+See [Read-only builder attribution](builder-attribution.md) for exact native order/fill and aggregate-credit commands, Mainnet export matching, and explicit testnet proof limits.

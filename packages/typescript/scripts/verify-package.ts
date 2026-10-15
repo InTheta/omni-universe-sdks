@@ -40,6 +40,8 @@ try {
     "docs/examples.md",
     "docs/trading-agents.md",
     "docs/guarded-testnet.md",
+    "docs/builder-attribution.md",
+    "examples/agents/builder-attribution-readonly.mjs",
     "examples/agents/guarded-execution.ts",
     "README.md",
     "LICENSE",
