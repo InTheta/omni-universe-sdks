@@ -13,7 +13,7 @@ npm run build
 npm pack
 ```
 
-To test the actual package boundary, create a clean directory, `npm init -y`, and `npm install /absolute/path/omni-terminal-sdk-0.8.1.tgz`. Import exclusively from `@omni-terminal/sdk`. Its execution client uses the pinned public `@nktkas/hyperliquid` SDK. Neither client sends private keys to Omni or MCP servers; a local MCP adapter must remain under the signer's control.
+To test the actual package boundary, create a clean directory, `npm init -y`, and `npm install /absolute/path/omni-terminal-sdk-0.8.2.tgz`. Import exclusively from `@omni-terminal/sdk`. Its execution client uses the pinned public `@nktkas/hyperliquid` SDK. Neither client sends private keys to Omni or MCP servers; a local MCP adapter must remain under the signer's control.
 
 For the included runner set the **exact** testnet account and validator perpetual symbol:
 

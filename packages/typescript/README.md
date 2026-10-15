@@ -19,13 +19,13 @@ Private deployment addresses are deliberately not embedded. Override the public 
 
 ## Install
 
-Use the coordinated v0.8.1 GitHub release archive once its tagged asset is published. If the archive is not available yet, use the source build below. npm registry publication is a separate release step. Read the [v0.8.1 release and migration notes](docs/releases/0.8.1.md) before upgrading.
+Use the v0.8.2 GitHub release archive once its tagged asset is published. If the archive is not available yet, use the source build below. npm registry publication is a separate release step. Read the [v0.8.2 packaging fix](docs/releases/0.8.2.md) and [v0.8.1 feature/runtime migration](docs/releases/0.8.1.md) before upgrading.
 
 ```bash
-npm install https://github.com/InTheta/omni-universe-sdks/releases/download/v0.8.1/omni-terminal-sdk-0.8.1.tgz
+npm install https://github.com/InTheta/omni-universe-sdks/releases/download/v0.8.2/omni-terminal-sdk-0.8.2.tgz
 ```
 
-These public contract versions were checked on 15 October 2026 and are separate from SDK package v0.8.1. The live schema and unpaid payment challenge take precedence over a version or price recorded in this guide.
+These public contract versions were checked on 15 October 2026 and are separate from SDK package v0.8.2. The live schema and unpaid payment challenge take precedence over a version or price recorded in this guide.
 
 The v0.8.0 artifact contains nine JSON product helpers and does not include
 `premarketRoundup()`, `premarketRoundupData()`, the forced-free `:free` scripts,

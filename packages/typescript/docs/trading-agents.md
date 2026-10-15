@@ -45,10 +45,10 @@ All `npm run example:*` commands load `.env` when present. Existing process envi
 
 For a command-by-command setup and side-effect matrix, including credential-free demos, read the [runnable example runbook](examples.md).
 
-Applications can install the coordinated v0.8.1 release artifact once its tagged archive is published; until then, use the source build above:
+Applications can install the v0.8.2 release artifact once its tagged archive is published; until then, use the source build above:
 
 ```bash
-npm install https://github.com/InTheta/omni-universe-sdks/releases/download/v0.8.1/omni-terminal-sdk-0.8.1.tgz
+npm install https://github.com/InTheta/omni-universe-sdks/releases/download/v0.8.2/omni-terminal-sdk-0.8.2.tgz
 ```
 
 ## 2. Configure research

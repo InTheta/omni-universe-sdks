@@ -7,7 +7,7 @@ supply trading authority or approve a builder fee.
 
 ## v0.8.1 prerequisite and clean installation
 
-The guarded API is included in coordinated v0.8.1 and is absent from historical v0.8.0. This repository example depends on the matching sibling SDK through a local package dependency. Build that SDK before installing the adapter. Node >=22.12 is required. For an external consumer use the v0.8.1 tagged archive once published; see the [release notes](../../packages/typescript/docs/releases/0.8.1.md). Run on Linux:
+The guarded API is included in coordinated v0.8.1 and is absent from historical v0.8.0. This repository example depends on the matching sibling SDK through a local package dependency. Build that SDK before installing the adapter. Node >=22.12 is required. For an external consumer use the v0.8.2 tagged archive once published; see the [packaging fix](../../packages/typescript/docs/releases/0.8.2.md). Run on Linux:
 
 ```bash
 cd packages/typescript
@@ -121,4 +121,4 @@ When backed by v0.8.1 containing `recentReconciliation`, this local adapter also
 
 Call `recent_reconciliation` with the exact recent window after a lifecycle. Inspect `expectedOrders.missing`, both source coverage/gap objects, observed fills and current exposure before drawing conclusions. `fullLedgerReconciled` is always false because upstream retention is unverified. Totals cover all observed fills/funding in the configured instrument-period; expected order IDs do not narrow those totals. Funding is not attributed to an individual order, builder fees are a subset of total fees, unrealized PnL is a separate current snapshot, and builder credit remains unverified. This tool creates no order and never retries a trade.
 
-This API is absent from the historical v0.8.0 archive. Use the SDK and adapter from the same reviewed v0.8.1 revision.
+This API is absent from the historical v0.8.0 archive. Use the SDK and adapter from the same reviewed release revision.

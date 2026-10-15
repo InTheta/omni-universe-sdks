@@ -8,14 +8,14 @@ Public SDKs, connection examples, market-data integrations, and guarded trading-
 
 | SDK | Status | Runtime | Coverage |
 | --- | --- | --- | --- |
-| [TypeScript](packages/typescript) | `0.8.1` coordinated release | Node.js 22.12+ | Omni API-key REST/WS, x402 REST, x402 MCP, direct Hyperliquid REST/WS, Coinbase and Robinhood agent examples |
+| [TypeScript](packages/typescript) | `0.8.2` declaration-dependency patch | Node.js 22.12+ | Omni API-key REST/WS, x402 REST, x402 MCP, direct Hyperliquid REST/WS, Coinbase and Robinhood agent examples |
 
 The TypeScript package is source-available here and produces `@omni-terminal/sdk`. Publishing to the npm registry is a separate release step and has not been performed yet.
 
-Install the coordinated `v0.8.1` GitHub release artifact once its tagged archive is published. If that archive is not available yet, build the reviewed source as described below; npm registry publication is separate. See the [v0.8.1 release and migration notes](packages/typescript/docs/releases/0.8.1.md).
+Install the `v0.8.2` GitHub release artifact once its tagged archive is published. If that archive is not available yet, build the reviewed source as described below; npm registry publication is separate. See the [v0.8.2 declaration-dependency fix](packages/typescript/docs/releases/0.8.2.md) and [v0.8.1 feature and runtime migration](packages/typescript/docs/releases/0.8.1.md).
 
 ```bash
-npm install https://github.com/InTheta/omni-universe-sdks/releases/download/v0.8.1/omni-terminal-sdk-0.8.1.tgz
+npm install https://github.com/InTheta/omni-universe-sdks/releases/download/v0.8.2/omni-terminal-sdk-0.8.2.tgz
 ```
 
 ## Connection model

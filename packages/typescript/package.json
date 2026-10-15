@@ -1,6 +1,6 @@
 {
   "name": "@omni-terminal/sdk",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "description": "Public TypeScript SDK for Omni AI News, x402/MCP analytics, and direct Hyperliquid market data",
   "type": "module",
   "main": "./dist/index.js",
@@ -61,6 +61,8 @@
     "@coinbase/cdp-sdk": "1.46.0",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@nktkas/hyperliquid": "0.33.3",
+    "@types/node": "^24.3.0",
+    "@types/ws": "^8.18.1",
     "@x402/core": "^2.20.0",
     "@x402/evm": "^2.20.0",
     "@x402/fetch": "^2.20.0",
@@ -70,8 +72,6 @@
     "ws": "^8.21.2"
   },
   "devDependencies": {
-    "@types/node": "^24.3.0",
-    "@types/ws": "^8.18.1",
     "tsx": "^4.23.5",
     "typescript": "^7.0.2"
   },
