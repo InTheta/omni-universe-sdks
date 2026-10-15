@@ -133,6 +133,13 @@ for await (const event of ws.news(ticket)) console.log(event.data);
 
 The news client sends a JSON ping every 55 seconds, inside the documented 60-second recommendation and 120-second idle timeout. Its receive queue is bounded to 1,000 frames by default and can be changed with `maxQueueSize`; when full, the oldest frame is discarded.
 
+Unlike the direct Hyperliquid client, the Omni News iterator does not reconnect
+automatically or replay history. Obtain a fresh single-use ticket before each new
+connection and reconcile missed history through REST. Iterator values include
+`subscribed`, `pong` and error control frames as well as event envelopes; inspect
+the envelope and payload timestamps before treating a frame as fresh news. The
+`ws-news` example stops after five received frames, not five verified news events.
+
 ## x402 REST — all ten paid JSON routes
 
 ```ts
