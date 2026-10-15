@@ -65,3 +65,12 @@ For GitHub Actions, configure `HL_TESTNET_PRIVATE_KEY` and optionally `HL_TESTNE
 Hyperliquid's testnet faucet requires the same address to have deposited on mainnet before it can claim mock USDC. See the [official testnet faucet instructions](https://hyperliquid.gitbook.io/hyperliquid-docs/onboarding/testnet-faucet) and [official API network documentation](https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api).
 
 Never reuse a mainnet private key. These examples are integration demonstrations, not profitable strategies or investment advice.
+
+## Local guarded MCP agent
+
+See [MCP trading and recovery](MCP_TRADING.md) for the separate stdio adapter,
+public SDK prerequisite, exact policy, permission probe, execution opt-in and
+journal recovery. The deployed `/api/x402/mcp` remains read-only; paying for data
+never grants trading authority. Current live proof covers read-only integration
+and a disabled-execution denial. Filled MCP lifecycle and builder attribution
+require a dedicated approved testnet signer and existing builder approval.

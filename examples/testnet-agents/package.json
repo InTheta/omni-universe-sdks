@@ -18,12 +18,17 @@
     "example:momentum": "node --env-file-if-exists=.env --import tsx agents/momentum-agent.ts",
     "example:mean-reversion": "node --env-file-if-exists=.env --import tsx agents/mean-reversion-agent.ts",
     "example:omni-risk": "node --env-file-if-exists=.env --import tsx agents/omni-risk-agent.ts",
-    "example:omni-risk:demo": "node --env-file-if-exists=.env --import tsx agents/omni-risk-agent.ts --demo"
+    "example:omni-risk:demo": "node --env-file-if-exists=.env --import tsx agents/omni-risk-agent.ts --demo",
+    "test:mcp": "node --import tsx --test test/mcp-trading.test.ts",
+    "agent:mcp": "node --env-file-if-exists=.env --import tsx src/mcp-trading-agent.ts",
+    "server:mcp": "node --env-file-if-exists=.env --import tsx src/mcp-trading-server.ts"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.1",
     "@nktkas/hyperliquid": "0.33.3",
     "@omni-terminal/sdk": "file:../../packages/typescript",
-    "viem": "2.55.10"
+    "viem": "2.55.10",
+    "zod": "3.25.76"
   },
   "devDependencies": {
     "@types/node": "24.3.0",
