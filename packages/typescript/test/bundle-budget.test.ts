@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { BundleBudget, BundleBudgetError, createAskOmniBundlePlan, createEvmPaymentClient, OMNI_USDC_ASSETS } from "../src/index.js";
+import { BundleBudget, BundleBudgetError, createAskOmniBundlePlan, createEvmPaymentClient, OMNI_USDC_ASSETS, validateBundlePngHeader } from "../src/index.js";
 
 const plan = () => createAskOmniBundlePlan({ symbol: "BTC", tier: "brief" });
 const adapter = async (step: { priceAtomic: number }) => ({ value: "mock", chargedAtomic: step.priceAtomic });
@@ -113,7 +113,9 @@ test("unreported or invalid charge retains ceiling; plan mutation cannot increas
 
 test("one-shot payment client rejects recovery/retry authorization, including concurrent creation", async () => {
   // Deterministic public test fixture, no funds, RPC, or submitted payloads.
-  const paymentClient = createEvmPaymentClient(`0x${"11".repeat(32)}`, { maxPaymentAuthorizations: 1 });
+  const options: { maxPaymentAuthorizations?: number } = { maxPaymentAuthorizations: 1 };
+  const paymentClient = createEvmPaymentClient(`0x${"11".repeat(32)}`, options);
+  options.maxPaymentAuthorizations = undefined;
   const requirement = {
     x402Version: 2,
     resource: { url: "https://example.test/paid" },
@@ -128,4 +130,44 @@ test("one-shot payment client rejects recovery/retry authorization, including co
   assert.equal(results.filter((result) => result.status === "fulfilled").length, 1);
   assert.equal(results.filter((result) => result.status === "rejected").length, 1);
   await assert.rejects(paymentClient.createPaymentPayload(requirement), /authorization limit/);
+});
+
+test("payment assets are captured at construction, not widened by caller/default mutation", async () => {
+  const assets: `0x${string}`[] = [OMNI_USDC_ASSETS["eip155:84532"][0]];
+  const paymentClient = createEvmPaymentClient(`0x${"11".repeat(32)}`, {
+    allowedAssets: { "eip155:84532": assets },
+  });
+  const defaultClient = createEvmPaymentClient(`0x${"11".repeat(32)}`);
+  const extraAsset = "0x0000000000000000000000000000000000000001";
+  assets.push(extraAsset);
+  const defaults = OMNI_USDC_ASSETS["eip155:84532"] as unknown as string[];
+  defaults.push(extraAsset);
+  try {
+    const challenge = {
+      x402Version: 2, resource: { url: "https://example.test/paid" },
+      accepts: [{ scheme: "exact", network: "eip155:84532" as const,
+        asset: extraAsset, amount: "1000",
+        payTo: "0x0000000000000000000000000000000000000002", maxTimeoutSeconds: 60,
+        extra: { name: "USDC", version: "2" } }],
+    };
+    await assert.rejects(paymentClient.createPaymentPayload(challenge));
+    await assert.rejects(defaultClient.createPaymentPayload(challenge));
+  } finally { defaults.pop(); }
+});
+
+test("visual proof requires the full PNG signature and initial IHDR with valid dimensions", () => {
+  assert.throws(() => validateBundlePngHeader(Uint8Array.of(0x89, 0x50, 0, 0, 0, 0, 0, 0)), /PNG header/);
+  const bytes = new Uint8Array(33);
+  bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const view = new DataView(bytes.buffer);
+  view.setUint32(8, 13); view.setUint32(12, 0x49484452);
+  view.setUint32(16, 1600); view.setUint32(20, 900);
+  assert.deepEqual(validateBundlePngHeader(bytes), { width: 1600, height: 900 });
+  bytes[7] = 0;
+  assert.throws(() => validateBundlePngHeader(bytes), /PNG header/);
+  bytes[7] = 0x0a;
+  view.setUint32(12, 0);
+  assert.throws(() => validateBundlePngHeader(bytes), /IHDR/);
+  view.setUint32(12, 0x49484452); view.setUint32(16, 0);
+  assert.throws(() => validateBundlePngHeader(bytes), /dimensions/);
 });

@@ -3,7 +3,7 @@ import { x402HTTPClient } from "@x402/core/client";
 import {
   BundleBudget, createAskOmniBundlePlan, createEvmPaymentClient,
   OmniMcpClient, OmniX402Client,
-  validatePaymentSettlement, type AskOmniBundleTier, type X402Symbol,
+  validatePaymentSettlement, validateBundlePngHeader, type AskOmniBundleTier, type X402Symbol,
 } from "@omni-terminal/sdk";
 
 const args = new Set(process.argv.slice(2));
@@ -62,8 +62,9 @@ const result = await budget.execute("ask-omni-cli", plan, async (step) => {
           const receipt = new x402HTTPClient(paymentClient).getPaymentSettleResponse((name) => response.headers.get(name));
           validatePaymentSettlement(step.resource!, receipt);
           const bytes = new Uint8Array(await response.arrayBuffer());
-          if (!response.headers.get("content-type")?.startsWith("image/png") || bytes.length < 8 || bytes[0] !== 0x89 || bytes[1] !== 0x50) throw new Error("Visual route did not return PNG");
-          return { contentType: "image/png", bytes: bytes.length };
+          if (response.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase() !== "image/png") throw new Error("Visual route did not return PNG");
+          const dimensions = validateBundlePngHeader(bytes);
+          return { contentType: "image/png", bytes: bytes.length, ...dimensions };
         }
       }
     })();
