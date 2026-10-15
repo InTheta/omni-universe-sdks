@@ -3,7 +3,7 @@ import { x402Client, x402HTTPClient } from "@x402/core/client";
 import { ExactEvmScheme } from "@x402/evm/exact/client";
 import { wrapFetchWithPayment } from "@x402/fetch";
 import { privateKeyToAccount } from "viem/accounts";
-import { OmniContractError, OmniPaymentError } from "./errors.js";
+import { OmniApiError, OmniContractError, OmniPaymentError } from "./errors.js";
 import { buildUrl, mergeSignals, parseResponse, type QueryValue } from "./http.js";
 import type {
   EntityResolution,
@@ -23,10 +23,22 @@ import type {
   X402Symbol,
 } from "./types.js";
 
+export interface ScreenshotPng { contentType: "image/png"; bytes: Uint8Array; byteLength: number }
+export interface LiquidationLevelsScreenshotQuery {
+  interval?: "1m" | "5m" | "15m" | "1h" | "2h" | "4h" | "8h" | "1d" | "3d" | "1w" | "1M";
+  scope?: "current" | "aggregate"; layout?: "compact" | "standard" | "tall";
+}
+export interface LiquidationBucketScreenshotQuery { price: number; side?: "all" | "buy" | "sell"; scope?: "current" | "aggregate" }
+export interface TraderProfileScreenshotQuery { symbol?: X402Symbol; range?: "1d" | "7d" | "30d" | "all"; tab?: "positions" | "pnl" | "balance" | "mixed"; mode?: "chart" | "stats" | "full_stats" }
+
 export interface OmniX402ClientOptions {
   baseUrl?: string;
   paymentClient: x402Client;
   timeoutMs?: number;
+  /** PNG rendering can take longer than JSON requests; default 150 seconds. */
+  screenshotTimeoutMs?: number;
+  /** Default 4 MiB; bounded to 16 MiB. Does not change payment budgets. */
+  maxScreenshotBytes?: number;
   fetch?: typeof fetch;
 }
 
@@ -109,6 +121,8 @@ export function usdToUsdcAtomic(value: number): bigint {
 export class OmniX402Client {
   readonly baseUrl: string;
   readonly timeoutMs: number;
+  readonly screenshotTimeoutMs: number;
+  readonly maxScreenshotBytes: number;
   readonly paymentClient: x402Client;
   private readonly fetcher: typeof fetch;
   private readonly rawFetcher: typeof fetch;
@@ -117,11 +131,21 @@ export class OmniX402Client {
   constructor(options: OmniX402ClientOptions) {
     this.baseUrl = options.baseUrl ?? "https://omniterminal.app";
     this.timeoutMs = options.timeoutMs ?? 30_000;
+    this.screenshotTimeoutMs = options.screenshotTimeoutMs ?? 150_000;
+    this.maxScreenshotBytes = options.maxScreenshotBytes ?? 4 * 1024 * 1024;
+    if (!Number.isSafeInteger(this.maxScreenshotBytes) || this.maxScreenshotBytes < 8 || this.maxScreenshotBytes > 16 * 1024 * 1024) throw new RangeError("maxScreenshotBytes must be an integer from 8 to 16777216");
+    if (!Number.isSafeInteger(this.screenshotTimeoutMs) || this.screenshotTimeoutMs < 1 || this.screenshotTimeoutMs > 180_000) throw new RangeError("screenshotTimeoutMs must be an integer from 1 to 180000");
     this.paymentClient = options.paymentClient;
     this.httpPaymentClient = new x402HTTPClient(options.paymentClient);
     this.rawFetcher = options.fetch ?? globalThis.fetch;
     this.fetcher = wrapFetchWithPayment(async (input, init) => {
+      const signal = init?.signal ?? (input instanceof Request ? input.signal : undefined);
+      signal?.throwIfAborted();
       const response = await this.rawFetcher(input, init);
+      if (signal?.aborted) {
+        cancelPaidResponseBody(response);
+        signal.throwIfAborted();
+      }
       if (response.status === 402 && response.headers.has("payment-required")) {
         const requestedUrl = input instanceof Request ? input.url : String(input);
         const required = decodePaymentRequiredHeader(response.headers.get("payment-required")!);
@@ -156,13 +180,7 @@ export class OmniX402Client {
         signal: mergeSignals(this.timeoutMs, options.signal),
       });
     } catch (error) {
-      if (error instanceof OmniContractError) throw error;
-      // Dependencies can embed the entire untrusted payment challenge in their error text.
-      const message = error instanceof Error ? error.message : "";
-      const code = message.includes("Aggregate payment authorization budget exceeded") ? "PAYMENT_BUDGET_EXCEEDED"
-        : message.includes("Payment authorization limit reached") ? "PAYMENT_AUTHORIZATION_LIMIT" : "PAYMENT_OUTCOME_UNKNOWN";
-      const kind = error instanceof Error && (error.name === "AbortError" || error.name === "TimeoutError") ? error.name : undefined;
-      throw new OmniPaymentError(code, kind);
+      throw redactedPaymentError(error);
     }
     const data = await parseResponse<T>(response);
     if (options.contract) validateProductContract(path, data, options.contract);
@@ -344,6 +362,89 @@ export class OmniX402Client {
     });
   }
 
+  /** Purchase a bounded PNG. The returned receipt is seller metadata; reconcile it on-chain separately. */
+  private async requestScreenshot(path: string, query: Record<string, QueryValue>): Promise<PaidResult<ScreenshotPng>> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(new DOMException("Screenshot request timed out", "TimeoutError")), this.screenshotTimeoutMs);
+    let response: Response | undefined;
+    try {
+      response = await waitForScreenshot(this.fetcher(buildUrl(this.baseUrl, path, query), {
+        method: "GET", redirect: "error", headers: { accept: "image/png" }, signal: controller.signal,
+      }), controller.signal);
+      if (!response.ok) throw new OmniApiError("Omni screenshot request failed", response.status, response, undefined);
+      if (response.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase() !== "image/png") {
+        throw new OmniContractError("Expected image/png screenshot", path, undefined);
+      }
+      let payment: PaymentReceipt | null = null;
+      try {
+        payment = this.httpPaymentClient.getPaymentSettleResponse((name) => response!.headers.get(name)) as PaymentReceipt;
+      } catch {
+        throw new OmniContractError("Invalid screenshot PAYMENT-RESPONSE", path, undefined);
+      }
+      validatePaymentSettlement(path, payment);
+      // Fetch decodes gzip/br, but Content-Length still describes wire bytes.
+      // Compare declared lengths only when they describe the decoded PNG body.
+      const encoding = response.headers.get("content-encoding")?.trim().toLowerCase();
+      const declaredLength = !encoding || encoding === "identity" ? response.headers.get("content-length") : null;
+      if (declaredLength !== null && (!/^\d+$/.test(declaredLength) || Number(declaredLength) > this.maxScreenshotBytes)) {
+        throw new OmniContractError("Screenshot exceeds client byte budget", path, undefined);
+      }
+      if (!response.body) throw new OmniContractError("Missing screenshot body", path, undefined);
+      const reader = response.body.getReader();
+      const chunks: Uint8Array[] = [];
+      let byteLength = 0;
+      try {
+        while (true) {
+          const { value, done } = await waitForScreenshot(reader.read(), controller.signal);
+          if (done) break;
+          byteLength += value.byteLength;
+          if (byteLength > this.maxScreenshotBytes) throw new OmniContractError("Screenshot exceeds client byte budget", path, undefined);
+          chunks.push(value);
+        }
+      } catch (error) {
+        // Adapter cancellation may never resolve. Close pending reads without waiting.
+        void reader.cancel().catch(() => undefined);
+        throw error;
+      } finally { reader.releaseLock(); }
+      if (declaredLength !== null && byteLength !== Number(declaredLength)) throw new OmniContractError("Screenshot length mismatch", path, undefined);
+      const bytes = new Uint8Array(byteLength);
+      let offset = 0;
+      for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+      const signature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+      if (!signature.every((value, index) => bytes[index] === value)) throw new OmniContractError("Invalid PNG signature", path, undefined);
+      return { data: { contentType: "image/png", bytes, byteLength }, payment, requestId: response.headers.get("x-request-id") };
+    } catch (error) {
+      if (response) cancelPaidResponseBody(response);
+      if (error instanceof OmniContractError || error instanceof OmniApiError) throw error;
+      throw redactedPaymentError(error);
+    } finally { clearTimeout(timer); }
+  }
+
+  liquidationLevelsScreenshot(symbol: X402Symbol, query: LiquidationLevelsScreenshotQuery = {}): Promise<PaidResult<ScreenshotPng>> {
+    assertSymbol(symbol);
+    assertOptionalOneOf("interval", query.interval, ["1m", "5m", "15m", "1h", "2h", "4h", "8h", "1d", "3d", "1w", "1M"]);
+    assertOptionalOneOf("scope", query.scope, ["current", "aggregate"]);
+    assertOptionalOneOf("layout", query.layout, ["compact", "standard", "tall"]);
+    return this.requestScreenshot(`/api/x402/v1/screenshots/liquidation-levels/${symbol}`, { ...query });
+  }
+
+  liquidationBucketScreenshot(symbol: X402Symbol, query: LiquidationBucketScreenshotQuery): Promise<PaidResult<ScreenshotPng>> {
+    assertSymbol(symbol);
+    if (!query || !Number.isFinite(query.price) || query.price <= 0 || query.price > 1_000_000_000) throw new RangeError("price must be a positive finite number at most 1000000000");
+    assertOptionalOneOf("side", query.side, ["all", "buy", "sell"]);
+    assertOptionalOneOf("scope", query.scope, ["current", "aggregate"]);
+    return this.requestScreenshot(`/api/x402/v1/screenshots/liquidation-bucket/${symbol}`, { ...query });
+  }
+
+  traderProfileScreenshot(address: string, query: TraderProfileScreenshotQuery = {}): Promise<PaidResult<ScreenshotPng>> {
+    if (!/^0x[0-9a-fA-F]{40}$/.test(address)) throw new RangeError("address must be a 20-byte EVM address");
+    if (query.symbol !== undefined) assertSymbol(query.symbol);
+    assertOptionalOneOf("range", query.range, ["1d", "7d", "30d", "all"]);
+    assertOptionalOneOf("tab", query.tab, ["positions", "pnl", "balance", "mixed"]);
+    assertOptionalOneOf("mode", query.mode, ["chart", "stats", "full_stats"]);
+    return this.requestScreenshot(`/api/x402/v1/screenshots/trader-profile/${encodeURIComponent(address)}`, { ...query });
+  }
+
   premarketRoundup(limit?: number): Promise<PaidResult<PremarketRoundup>>;
   premarketRoundup(query?: PremarketRoundupQuery): Promise<PaidResult<PremarketRoundup>>;
   premarketRoundup(input: number | PremarketRoundupQuery = 1): Promise<PaidResult<PremarketRoundup>> {
@@ -448,4 +549,34 @@ export function validatePaymentSettlement(route: string, payment: unknown): asse
   if (record.network !== "eip155:8453" && record.network !== "eip155:84532") {
     throw new OmniContractError(`Invalid payment settlement for ${route}: missing network`, route, payment);
   }
+}
+
+
+function redactedPaymentError(error: unknown): Error {
+  if (error instanceof OmniContractError) return error;
+  const message = error instanceof Error ? error.message : "";
+  const code = message.includes("Aggregate payment authorization budget exceeded") ? "PAYMENT_BUDGET_EXCEEDED"
+    : message.includes("Payment authorization limit reached") ? "PAYMENT_AUTHORIZATION_LIMIT" : "PAYMENT_OUTCOME_UNKNOWN";
+  const kind = error instanceof Error && (error.name === "AbortError" || error.name === "TimeoutError") ? error.name : undefined;
+  return new OmniPaymentError(code, kind);
+}
+
+
+function cancelPaidResponseBody(response: Response): void {
+  // Best-effort cleanup must not extend the caller deadline or expose adapter errors.
+  try { void response.body?.cancel().catch(() => undefined); } catch { /* already locked/closed */ }
+}
+
+async function waitForScreenshot<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) {
+    void promise.catch(() => undefined);
+    signal.throwIfAborted();
+  }
+  let rejectOnAbort!: () => void;
+  const aborted = new Promise<never>((_, reject) => {
+    rejectOnAbort = () => reject(signal.reason);
+    signal.addEventListener("abort", rejectOnAbort, { once: true });
+  });
+  try { return await Promise.race([promise, aborted]); }
+  finally { signal.removeEventListener("abort", rejectOnAbort); }
 }
