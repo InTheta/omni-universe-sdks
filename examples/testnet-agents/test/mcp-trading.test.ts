@@ -1,4 +1,5 @@
 import test from "node:test";
+import { assertTradingTools } from "../src/mcp-discovery.js";
 import { reconciliationResult } from "../src/mcp-result.js";
 import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, statSync } from "node:fs";
@@ -35,6 +36,8 @@ test("actual MCP discovery validates schema and fixes policy scope outside tool 
   try {
     const tools = (await s.client.listTools()).tools;
     assert.equal(tools.length, 8);
+    assertTradingTools(tools);
+    assert.throws(() => assertTradingTools(tools.filter(tool => tool.name !== "submit_order")), /omitted required trading tool: submit_order/);
     for (const tool of tools) assert(!JSON.stringify(tool.inputSchema).match(/privateKey|accountAddress|network|builder/));
     const invalid = await s.call("preview_order", { side: "UNKNOWN", notionalUsd: 15 });
     assert.equal(invalid.isError, true);
@@ -126,7 +129,10 @@ test("read-only reconciliation tool keeps account policy outside inputs and retu
       limits: { conservativePageThreshold: 500, fillRetention: "latest_10000_fills", builderCredit: "unverified", fundingAttribution: "account_instrument_period_not_order" } };
   });
   try {
-    const tool = (await s.client.listTools()).tools.find(tool => tool.name === "recent_reconciliation")!;
+    const tools = (await s.client.listTools()).tools;
+    assert.equal(tools.length, 9);
+    assertTradingTools(tools);
+    const tool = tools.find(tool => tool.name === "recent_reconciliation")!;
     assert.equal(tool.annotations?.readOnlyHint, true);
     assert(!JSON.stringify(tool.inputSchema).match(/accountAddress|network|builder|privateKey/));
     const invalid = await s.call("recent_reconciliation", { startTime: 0, endTime: 100, maxRequests: 17 });
