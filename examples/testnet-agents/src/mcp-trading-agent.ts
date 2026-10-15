@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { reconciliationResult } from "./mcp-result.js";
 import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
@@ -33,7 +34,9 @@ try {
     attempted.push(recoverPlanId);
     evidence.recoveredPlanId = recoverPlanId;
     evidence.cancellation = await call("cancel_order", { planId: recoverPlanId });
-    evidence.reconciliation = await call("reconcile", { planId: recoverPlanId });
+    const recovered = await call("reconcile", { planId: recoverPlanId });
+    evidence.reconciliation = recovered;
+    assert.equal(reconciliationResult(recovered).complete, true, "Recovered outcome remains uncertain; preserve journal and reconcile");
   } else {
   evidence.market = await call("market");
   evidence.account = await call("account");
@@ -51,8 +54,9 @@ try {
     evidence.submission = await call("submit_order", { planId });
     evidence.status = await call("order_status", { planId });
     evidence.cancellation = await call("cancel_order", { planId });
-    const reconciled = await call("reconcile", { planId }) as { complete?: boolean; fills?: unknown[] };
-    evidence.reconciliation = reconciled;
+    const reconciliation = await call("reconcile", { planId });
+    evidence.reconciliation = reconciliation;
+    const reconciled = reconciliationResult(reconciliation);
     assert.equal(reconciled.complete, true, "Opening outcome remains uncertain; do not resubmit");
     if (ioc) {
       assert(reconciled.fills?.length, "IOC had no fills; full filled lifecycle remains unverified");
@@ -61,8 +65,9 @@ try {
       attempted.push(reduction.planId);
       evidence.reductionSubmission = await call("submit_order", { planId: reduction.planId });
       evidence.reductionCancel = await call("cancel_order", { planId: reduction.planId });
-      const final = await call("reconcile", { planId: reduction.planId }) as { complete?: boolean; remainingExposure?: unknown[]; fills?: unknown[] };
-      evidence.finalReconciliation = final;
+      const finalReconciliation = await call("reconcile", { planId: reduction.planId });
+      evidence.finalReconciliation = finalReconciliation;
+      const final = reconciliationResult(finalReconciliation);
       assert.equal(final.complete, true);
       assert(final.fills?.length, "Reduction had no fills; cleanup unverified");
       assert.equal(final.remainingExposure?.length, 0, "Unexpected remaining exposure: operator reconciliation required");

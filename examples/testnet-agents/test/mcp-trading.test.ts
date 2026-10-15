@@ -1,4 +1,5 @@
 import test from "node:test";
+import { reconciliationResult } from "../src/mcp-result.js";
 import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -52,7 +53,11 @@ test("one-use plan, durable private journal, known-scope status/cancel/reconcile
     assert.equal(s.submits(), 1);
     assert.equal(data(await s.call("order_status", { planId })).result && true, true);
     assert.equal((await s.call("cancel_order", { planId })).isError, undefined);
-    assert.equal((await s.call("reconcile", { planId })).isError, undefined);
+    const reconciled = await s.call("reconcile", { planId });
+    assert.equal(reconciled.isError, undefined);
+    assert.equal(reconciliationResult(data(reconciled)).complete, true);
+    assert.throws(() => reconciliationResult({ complete: true }), /SCHEMA_MISMATCH/);
+    assert.equal(reconciliationResult({ planId, result: { complete: false } }).complete, false);
     assert.equal(statSync(journalPath).mode & 0o077, 0);
     assert.equal(JSON.parse(readFileSync(journalPath, "utf8")).entries[0].state, "submitted");
     const second = data(await s.call("preview_order", { side: "SELL", notionalUsd: 15 })).planId as string;
