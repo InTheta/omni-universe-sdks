@@ -6,6 +6,7 @@ import { z } from "zod";
 
 /** The server receives an already policy-bound public SDK executor, never a key in tool input. */
 export interface TradingExecutor {
+  recentReconciliation?(options: { startTime: number; endTime: number; maxRequests?: number; timeoutMs?: number; expectedOrderIds?: readonly number[]; signal?: AbortSignal }): Promise<unknown>;
   market(): Promise<unknown>;
   account(): Promise<unknown>;
   preview(side: "BUY" | "SELL", notionalUsd: number, options?: { kind: "ioc" }): Promise<unknown>;
@@ -97,6 +98,33 @@ export function createGuardedTradingMcpServer(createExecutor: (persist: (journal
     if (!entry) throw new Error("unknown_plan_id");
     return entry;
   };
+  const recent = executor.recentReconciliation?.bind(executor);
+  if (recent) {
+    const time = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
+    const coverage = z.object({ requests: time, accountRowsObserved: time, instrumentRowsObserved: time,
+      requestedWindowFetched: z.boolean(), retentionVerified: z.literal(false),
+      gaps: z.array(z.object({ startTime: time, endTime: time, reason: z.enum(["request_budget_exhausted", "same_timestamp_saturation", "request_failed", "deadline_exceeded"]) })) });
+    const report = z.object({ schema: z.literal("omni.hyperliquid_recent_reconciliation.v1"), network: z.literal("hyperliquid-testnet"),
+      accountAddress: address, symbol: z.string(), observedAt: time, fullLedgerReconciled: z.literal(false),
+      window: z.object({ startTime: time, endTime: time, inclusive: z.literal(true) }),
+      fills: z.array(fillSchema.extend({ tid: time, time, hash: z.string(), side: z.enum(["B", "A"]), startPosition: decimal, dir: z.string(), closedPnl: decimal })),
+      funding: z.array(z.object({ time, hash: z.string(), delta: z.object({ type: z.literal("funding"), coin: z.string(), usdc: decimal, szi: decimal, fundingRate: decimal, nSamples: time.nullable() }) })),
+      expectedOrders: z.object({ requested: z.array(time), observed: z.array(time), missing: z.array(time) }),
+      totals: z.object({ scope: z.literal("observed_instrument_period"), closedPnlUsdc: decimal, fundingNetUsdc: decimal,
+        feesByToken: z.record(decimal), builderFeesIncludedByToken: z.record(decimal), realizedNetCashPnlUsdc: decimal.nullable(),
+        netCashPnlUnavailableReason: z.literal("non_usdc_fees").nullable() }),
+      snapshot: z.object({ observedAt: time, venueTime: time.nullable(), position: z.object({ coin: z.string(), szi: decimal, unrealizedPnl: decimal }).nullable() }),
+      coverage: z.object({ fills: coverage, funding: coverage }),
+      limits: z.object({ conservativePageThreshold: z.literal(500), fillRetention: z.literal("latest_10000_fills"), builderCredit: z.literal("unverified"), fundingAttribution: z.literal("account_instrument_period_not_order") }),
+    });
+    server.registerTool("recent_reconciliation", {
+      description: "Read bounded TESTNET instrument-period fills, funding and decimal cash PnL for the startup-bound account. Reports coverage gaps; never proves a full ledger or builder credit. Builder fees are already included in total fees. No signing required.",
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+      inputSchema: { startTime: time.describe("Inclusive Unix milliseconds"), endTime: time.describe("Inclusive past Unix milliseconds; maximum seven-day window"),
+        maxRequests: z.number().int().min(4).max(16).default(12), timeoutMs: z.number().int().min(1).max(60000).default(20000),
+        expectedOrderIds: z.array(time).max(64).optional() }, outputSchema: output(report),
+    }, (options, extra) => guarded(() => recent({ ...options, signal: extra.signal })));
+  }
   server.registerTool("market", { description: "Resolve the exact startup-bound Hyperliquid TESTNET market; no fallback symbol.", inputSchema: {}, outputSchema: output(z.object({ asset: z.number().int(), symbol: z.string(), szDecimals: z.number().int(), midPrice: z.number().positive().describe("Quote USD per base unit"), bookTime: z.number().int().describe("Unix milliseconds") })) }, () => guarded(() => executor.market()));
   server.registerTool("account", { description: "Read the exact policy-bound TESTNET account collateral, positions and permissions.", inputSchema: {}, outputSchema: output(z.object({ network: z.literal("hyperliquid-testnet"), accountAddress: address, state: z.object({ withdrawable: decimal.describe("Withdrawable testnet USD collateral"), marginSummary: marginSchema, crossMarginSummary: marginSchema, crossMaintenanceMarginUsed: decimal.optional(), assetPositions: z.array(positionSchema) }).passthrough(), approvedBuilderFee: z.number().nonnegative().describe("Approved tenths of a basis point") })) }, () => guarded(() => executor.account()));
   server.registerTool("preview_order", { description: "Prepare a bounded TESTNET order, without signing. Returns a server-generated one-use plan ID.", inputSchema: { side: z.enum(["BUY", "SELL"]), notionalUsd: z.number().finite().min(10).max(25), kind: z.enum(["passive", "ioc"]).default("passive") }, outputSchema: output(z.object({ planId: z.string().uuid(), plan: planSchema })) }, ({ side, notionalUsd, kind }) => guarded(async () => {

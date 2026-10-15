@@ -1,3 +1,4 @@
+import { collectRecentReconciliation, type RecentReconciliationOptions, type RecentReconciliationReport } from "./reconciliation-report.js";
 import { ApiRequestError } from "@nktkas/hyperliquid/api/exchange";
 import { ExchangeClient, HttpTransport, InfoClient } from "@nktkas/hyperliquid";
 import { formatPrice, formatSize } from "@nktkas/hyperliquid/utils";
@@ -96,6 +97,11 @@ export class GuardedTestnetExecutor {
       availableCollateralUsd: finiteDecimal(state.withdrawable),
     };
     return { network: "hyperliquid-testnet" as const, accountAddress: user, state, margin, approvedBuilderFee };
+  }
+
+  /** Free testnet reads only. Returned totals cover observed instrument-period rows, not a full ledger. */
+  recentReconciliation(options: RecentReconciliationOptions): Promise<RecentReconciliationReport> {
+    return collectRecentReconciliation(this.#info, this.#policy, options);
   }
 
   async preview(side: "BUY" | "SELL", notionalUsd: number, options: { kind?: "passive" | "ioc" } = {}): Promise<GuardedTestnetPlan> {

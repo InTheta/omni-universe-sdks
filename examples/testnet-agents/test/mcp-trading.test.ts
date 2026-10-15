@@ -8,9 +8,10 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createGuardedTradingMcpServer, type TradingExecutor } from "../src/mcp-trading.js";
 
-async function session(path: string, uncertain = false, hold?: Promise<void>) {
+async function session(path: string, uncertain = false, hold?: Promise<void>, recent?: TradingExecutor["recentReconciliation"]) {
   let submits = 0;
   const server = createGuardedTradingMcpServer(persist => ({
+    ...(recent ? { recentReconciliation: recent } : {}),
     async market() { return { symbol: "EXACT", network: "hyperliquid-testnet" }; },
     async account() { return { accountAddress: "fixed_test_account", withdrawable: "100" }; },
     async preview(side, notionalUsd) { return { side, notionalUsd, cloid: "0x" + Date.now().toString(16).padStart(32, "0"), network: "hyperliquid-testnet", accountAddress: "0x" + "1".repeat(40), symbol: "EXACT", asset: 0, price: "100", size: "0.15", createdAt: Date.now(), expiresAt: Date.now() + 15000, tif: "Alo", reduceOnly: false, builder: { b: "0x" + "2".repeat(40), f: 10 } }; },
@@ -109,4 +110,32 @@ test("MCP timeout cannot duplicate an in-flight submission; same-plan reconcilia
     assert.equal((await s.call("cancel_order", { planId })).isError, undefined);
     assert.equal(s.submits(), 1);
   } finally { release(); await s.client.close(); await s.server.close(); }
+});
+
+test("read-only reconciliation tool keeps account policy outside inputs and returns explicit coverage", async () => {
+  let calls = 0;
+  const coverage = { requests: 1, accountRowsObserved: 0, instrumentRowsObserved: 0, requestedWindowFetched: true, retentionVerified: false, gaps: [] };
+  const s = await session(path(), false, undefined, async options => {
+    calls++;
+    assert.equal(options.maxRequests, 12);
+    assert.ok(options.signal instanceof AbortSignal);
+    return { schema: "omni.hyperliquid_recent_reconciliation.v1", network: "hyperliquid-testnet", accountAddress: "0x" + "1".repeat(40), symbol: "EXACT", observedAt: 100,
+      window: { startTime: options.startTime, endTime: options.endTime, inclusive: true }, fullLedgerReconciled: false, fills: [], funding: [],
+      expectedOrders: { requested: [7], observed: [], missing: [7] }, totals: { scope: "observed_instrument_period", closedPnlUsdc: "0", fundingNetUsdc: "0", feesByToken: {}, builderFeesIncludedByToken: {}, realizedNetCashPnlUsdc: "0", netCashPnlUnavailableReason: null },
+      snapshot: { observedAt: 100, venueTime: 100, position: null }, coverage: { fills: coverage, funding: coverage },
+      limits: { conservativePageThreshold: 500, fillRetention: "latest_10000_fills", builderCredit: "unverified", fundingAttribution: "account_instrument_period_not_order" } };
+  });
+  try {
+    const tool = (await s.client.listTools()).tools.find(tool => tool.name === "recent_reconciliation")!;
+    assert.equal(tool.annotations?.readOnlyHint, true);
+    assert(!JSON.stringify(tool.inputSchema).match(/accountAddress|network|builder|privateKey/));
+    const invalid = await s.call("recent_reconciliation", { startTime: 0, endTime: 100, maxRequests: 17 });
+    assert.equal(invalid.isError, true);
+    assert.equal(calls, 0);
+    const response = await s.call("recent_reconciliation", { startTime: 0, endTime: 100, expectedOrderIds: [7] });
+    assert.equal(response.isError, undefined);
+    assert.equal(data(response).fullLedgerReconciled, false);
+    assert.equal(calls, 1);
+    assert.equal(s.submits(), 0);
+  } finally { await s.client.close(); await s.server.close(); }
 });

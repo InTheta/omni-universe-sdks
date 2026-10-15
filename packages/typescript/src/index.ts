@@ -11,3 +11,5 @@ export * from "./ws.js";
 export * from "./x402.js";
 
 export * from "./guarded-testnet.js";
+
+export type { RecentReconciliationOptions, RecentReconciliationReport, ReconciliationFill, ReconciliationFunding, ReconciliationCoverage } from "./reconciliation-report.js";

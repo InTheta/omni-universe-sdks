@@ -120,3 +120,12 @@ that cannot change this startup policy.
 - Funded MCP order/fill/reduction and builder export attribution: **unverified**
   until dedicated authorized signer and existing canonical builder approval are
   available. Do not describe fixture results as sandbox fills.
+
+
+## Read-only recent execution accounting (unreleased source)
+
+When backed by the SDK source containing `recentReconciliation`, this local adapter also advertises `recent_reconciliation`. Its inputs are explicit inclusive `startTime`/`endTime` in Unix milliseconds (at most seven days), optional expected order IDs, a maximum 4–16 total requests and a 20-second default deadline. Account, instrument, network, signer, builder and fee policy remain fixed at server startup. The tool forwards MCP cancellation to the read-only SDK call and needs no signer or execution opt-in.
+
+Call `recent_reconciliation` with the exact recent window after a lifecycle. Inspect `expectedOrders.missing`, both source coverage/gap objects, observed fills and current exposure before drawing conclusions. `fullLedgerReconciled` is always false because upstream retention is unverified. Totals cover all observed fills/funding in the configured instrument-period; expected order IDs do not narrow those totals. Funding is not attributed to an individual order, builder fees are a subset of total fees, unrealized PnL is a separate current snapshot, and builder credit remains unverified. This tool creates no order and never retries a trade.
+
+This API is source-only and is not present in the published v0.8.0 archive. Test the SDK and adapter from the same reviewed source revision.
