@@ -27,6 +27,10 @@ function safeErrorCode(body: unknown): string {
 }
 
 export class OmniApiError extends Error {
+  /** Present only after a paid response fails processing; reconcile before another authorization. */
+  declare readonly requiresReconciliation?: true;
+  declare readonly retryable?: false;
+  declare readonly paymentOutcome?: "unconfirmed";
   readonly code: string;
   readonly status: number;
   readonly requestId: string | null;
@@ -52,6 +56,10 @@ export class OmniConfigurationError extends Error {
 }
 
 export class OmniContractError extends Error {
+  /** Present only after a paid response fails processing; reconcile before another authorization. */
+  declare readonly requiresReconciliation?: true;
+  declare readonly retryable?: false;
+  declare readonly paymentOutcome?: "unconfirmed";
   readonly code = "INVALID_RESPONSE_CONTRACT";
   readonly route: string;
   readonly details: unknown;

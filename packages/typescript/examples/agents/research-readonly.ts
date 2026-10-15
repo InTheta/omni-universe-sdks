@@ -8,7 +8,8 @@ import {
 const selected = process.env.RESEARCH_SYMBOL;
 if (!selected || !["BTC", "ETH", "SOL", "HYPE"].includes(selected)) throw new Error("Set RESEARCH_SYMBOL to an exact supported symbol: BTC, ETH, SOL, HYPE");
 const symbol = selected as X402Symbol;
-const paid = process.env.RUN_PAID_RESEARCH === "true";
+const freeOnly = process.argv.slice(2).includes("--free-only");
+const paid = !freeOnly && process.env.RUN_PAID_RESEARCH === "true";
 if (paid && (process.env.CONFIRM_RESEARCH_TESTNET_BUDGET !== "0.010 USDC ON BASE SEPOLIA" || !process.env.EVM_PRIVATE_KEY)) {
   throw new Error("Paid mode requires EVM_PRIVATE_KEY and CONFIRM_RESEARCH_TESTNET_BUDGET='0.010 USDC ON BASE SEPOLIA'; obtain human approval first");
 }

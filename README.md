@@ -8,14 +8,14 @@ Public SDKs, connection examples, market-data integrations, and guarded trading-
 
 | SDK | Status | Runtime | Coverage |
 | --- | --- | --- | --- |
-| [TypeScript](packages/typescript) | `0.8.2` declaration-dependency patch | Node.js 22.12+ | Omni API-key REST/WS, x402 REST, x402 MCP, direct Hyperliquid REST/WS, Coinbase and Robinhood agent examples |
+| [TypeScript](packages/typescript) | `0.8.3` paid recovery and compiled examples | Node.js 22.12+ | Omni API-key REST/WS, x402 REST, x402 MCP, direct Hyperliquid REST/WS, Coinbase and Robinhood agent examples |
 
 The TypeScript package is source-available here and produces `@omni-terminal/sdk`. Publishing to the npm registry is a separate release step and has not been performed yet.
 
-Install the `v0.8.2` GitHub release artifact once its tagged archive is published. If that archive is not available yet, build the reviewed source as described below; npm registry publication is separate. See the [v0.8.2 declaration-dependency fix](packages/typescript/docs/releases/0.8.2.md) and [v0.8.1 feature and runtime migration](packages/typescript/docs/releases/0.8.1.md).
+Install the `v0.8.3` GitHub release artifact once its tagged archive is published. If that archive is not available yet, build the reviewed source as described below; npm registry publication is separate. See the [v0.8.3 recovery/example fixes](packages/typescript/docs/releases/0.8.3.md), [v0.8.2 declaration-dependency fix](packages/typescript/docs/releases/0.8.2.md) and [v0.8.1 feature and runtime migration](packages/typescript/docs/releases/0.8.1.md).
 
 ```bash
-npm install https://github.com/InTheta/omni-universe-sdks/releases/download/v0.8.2/omni-terminal-sdk-0.8.2.tgz
+npm install https://github.com/InTheta/omni-universe-sdks/releases/download/v0.8.3/omni-terminal-sdk-0.8.3.tgz
 ```
 
 ## Connection model
@@ -35,6 +35,7 @@ Public Hyperliquid reads go directly to Hyperliquid. Omni API keys are used only
 | Guide | Contents |
 | --- | --- |
 | [TypeScript SDK reference](packages/typescript/README.md) | Installation, every REST/WS/x402/MCP connection, runtime validation and verification |
+| [Installed archive quickstarts](packages/typescript/docs/installed-quickstarts.md) | Run compiled public-data, MCP, research, preview and recovery examples without consumer dev dependencies |
 | [Runnable example runbook](packages/typescript/docs/examples.md) | Every command, safe demo, required credential, side effect and expected completion behavior |
 | [Coinbase and Robinhood agent guide](packages/typescript/docs/trading-agents.md) | Complete setup, data flow, credentials, dry runs, live gates, custom agents and test matrix |
 | [Agentic trading zero-to-one](packages/typescript/docs/agentic-trading-0-to-1.md) | Coinbase Agentic Wallet x402 discovery/payment, Omni evidence, Robinhood Trading MCP, and runnable broker adapters |

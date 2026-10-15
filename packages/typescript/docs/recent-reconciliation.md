@@ -11,8 +11,7 @@ npm pack
 
 For a clean package-boundary check, run `npm init -y` in a new directory, install
 the generated tarball using its absolute path, then import only from
-`@omni-terminal/sdk`. The included runnable example is
-`examples/agents/reconciliation-readonly.ts`.
+`@omni-terminal/sdk`. The archive includes compiled `dist-examples/agents/reconciliation-readonly.js`; use [installed SDK quickstarts](installed-quickstarts.md) for package-consumer setup. Its `.ts` source remains available for inspection.
 
 ## First free report
 
@@ -98,3 +97,5 @@ npm run build
 Fixtures verify arithmetic, rebates, funding signs, fee-token separation,
 pagination boundaries, truncation, duplicate conflicts and request failures.
 They are deterministic tests, not funded execution or full-ledger proof.
+
+Regression files under `test/` are source-only and are not shipped in the SDK archive. Clone the matching tagged repository and install its development dependencies before the source-test commands above.

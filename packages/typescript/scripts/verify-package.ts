@@ -33,11 +33,20 @@ try {
   for (const required of [
     "dist/index.js",
     "dist/index.d.ts",
+    "dist-examples/rest-api-key.js",
+    "dist-examples/mcp-all-tools.js",
+    "dist-examples/mcp-interoperability.js",
+    "dist-examples/agents/research-readonly.js",
+    "dist-examples/agents/guarded-execution.js",
+    "dist-examples/agents/guarded-lifecycle.js",
+    "dist-examples/agents/lifecycle-recovery.js",
+    "dist-examples/agents/payment-recovery.js",
     "dist/brokers/index.js",
     "dist/brokers/index.d.ts",
     "examples/rest-api-key.ts",
     "examples/x402-all-routes.ts",
     "docs/examples.md",
+    "docs/installed-quickstarts.md",
     "docs/trading-agents.md",
     "docs/guarded-testnet.md",
     "docs/builder-attribution.md",
@@ -65,13 +74,19 @@ try {
   // arrive transitively; repository devDependencies cannot mask broken types.
   const consumerTypes = `
     import {
-      GuardedTestnetExecutor, OmniX402Client, OmniWebSocketClient,
+      GuardedTestnetExecutor, OmniX402Client, OmniWebSocketClient, OmniApiError, OmniContractError,
       HyperliquidWebSocketClient,
       type OmniWebSocketOptions, type HyperliquidWebSocketOptions,
       type RecentReconciliationOptions, type RecentReconciliationReport,
     } from "@omni-terminal/sdk";
     import { CoinbaseAdvancedTradeClient, RobinhoodCryptoClient } from "@omni-terminal/sdk/brokers";
 
+    export function recoveryMetadata(error: OmniApiError | OmniContractError): void {
+      const requiresReconciliation: true | undefined = error.requiresReconciliation;
+      const retryable: false | undefined = error.retryable;
+      const paymentOutcome: "unconfirmed" | undefined = error.paymentOutcome;
+      void [requiresReconciliation, retryable, paymentOutcome];
+    }
     export function recent(executor: GuardedTestnetExecutor, options: RecentReconciliationOptions): Promise<RecentReconciliationReport> {
       return executor.recentReconciliation(options);
     }
@@ -124,6 +139,28 @@ try {
     if (typeof brokers.RobinhoodCryptoClient !== "function") throw new Error("missing Robinhood broker export");
   `;
   run(process.execPath, ["--input-type=module", "--eval", smokeTest], consumer);
+  const installedRoot = join(consumer, "node_modules", "@omni-terminal", "sdk");
+  const recovery = JSON.parse(run(process.execPath, [join(installedRoot, "dist-examples", "agents", "lifecycle-recovery.js")], consumer)) as {evidence: string; venueRequests: number; signatures: number; scenarios: unknown[]};
+  assert.equal(recovery.evidence, "mock-tested");
+  assert.equal(recovery.venueRequests, 0);
+  assert.equal(recovery.signatures, 0);
+  assert.equal(recovery.scenarios.length, 9);
+  const noScope = spawnSync(process.execPath, [join(installedRoot, "dist-examples", "agents", "guarded-execution.js"), "--preview-only"], {cwd: consumer, encoding: "utf8", env: {PATH: process.env.PATH}, timeout: 15000});
+  assert.equal(noScope.status, 1, "Preview without exact account/symbol must fail before network");
+  assert.match(noScope.stderr, /Set exact HL_TESTNET_ACCOUNT_ADDRESS and TESTNET_SYMBOL/);
+  assert.doesNotMatch(noScope.stderr, /ERR_MODULE_NOT_FOUND|Cannot find package/);
+  const denyNetwork = join(consumer, "deny-network.mjs");
+  writeFileSync(denyNetwork, `globalThis.fetch = async () => { process.stderr.write("UNSIGNED_READ_REACHED\\n"); throw new Error("EXPECTED_UNSIGNED_READ_STOP"); };`);
+  for (const [file, args, extraEnv] of [
+    ["research-readonly.js", ["--free-only"], {RESEARCH_SYMBOL: "BTC", RUN_PAID_RESEARCH: "true", CONFIRM_RESEARCH_TESTNET_BUDGET: "0.010 USDC ON BASE SEPOLIA", EVM_PRIVATE_KEY: "sentinel-not-a-key"}],
+    ["guarded-execution.js", ["--preview-only"], {HL_TESTNET_ACCOUNT_ADDRESS: `0x${"11".repeat(20)}`, TESTNET_SYMBOL: "BTC", RUN_TESTNET_ORDERS: "true", CONFIRM_TESTNET_ORDER: "sentinel-wrong-confirmation", HL_TESTNET_PRIVATE_KEY: "sentinel-not-a-key", TESTNET_JOURNAL_DIRECTORY: join(consumer, "fixture-journals")}],
+  ] as const) {
+    const probe = spawnSync(process.execPath, ["--import", denyNetwork, join(installedRoot, "dist-examples", "agents", file), ...args], {cwd: consumer, encoding: "utf8", env: {PATH: process.env.PATH, ...extraEnv}, timeout: 15000});
+    assert.equal(probe.status, 1, "Fixture stops at the first unsigned read");
+    assert.match(probe.stderr, /UNSIGNED_READ_REACHED/, "Safe override must reach unsigned transport without parsing sentinel keys or live confirmations");
+    assert.doesNotMatch(probe.stderr, /ERR_MODULE_NOT_FOUND|Cannot find package/);
+  }
+  console.log("Packed compiled examples run without tsx or consumer devDependencies; recovery fixtures and missing-scope guard passed");
   console.log(`Package consumer smoke passed: ${packed.name}@${packed.version} (${paths.length} files)`);
 } finally {
   rmSync(temporaryRoot, { recursive: true, force: true });

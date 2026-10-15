@@ -1,17 +1,17 @@
 # Runnable examples
 
-This runbook covers every public example command, what it contacts, what it can spend, and when it exits. Commands are run from `packages/typescript` unless the table says otherwise.
+For an installed archive with no development dependencies, start with [installed SDK quickstarts](installed-quickstarts.md). This runbook describes source-checkout npm commands, what they contact, what they can spend, and when they exit. Commands run from `packages/typescript` after its build unless stated otherwise.
 
 ## Install
 
 ```bash
-git clone https://github.com/InTheta/omni-universe-sdks.git
+git clone --branch v0.8.3 https://github.com/InTheta/omni-universe-sdks.git
 cd omni-universe-sdks/packages/typescript
 npm ci
 npm run verify
 ```
 
-Node.js 22.12 or newer is required for v0.8.1. Every `npm run example:*` command loads `.env` when present; values already injected into the process environment take precedence.
+Node.js 22.12 or newer is required for v0.8.3. Every `npm run example:*` command loads `.env` when present; values already injected into the process environment take precedence.
 
 ## Start with the no-spend demos
 
@@ -118,21 +118,33 @@ npm run example:robinhood:demo
 
 The configured agents make one paid `market-risk` request by default. With `OMNI_RESEARCH_TRANSPORT=both`, they buy Market Risk over x402 REST and Market Carry over native x402 MCP for an exact maximum session spend of `0.013` USDC. Coinbase dry-run makes an authenticated preview request but never calls create-order. Robinhood Crypto dry-run constructs the exact v2 path and body locally and makes no Robinhood request. Real submission requires `LIVE_TRADING=true` plus the broker-specific `CONFIRM_LIVE_ORDER` value. For Coinbase Agentic Wallet and the official Robinhood Trading MCP, follow [agentic trading from zero to one](agentic-trading-0-to-1.md).
 
-## Hyperliquid testnet agents
+## Hyperliquid testnet and local MCP agents (source checkout)
 
-The separate Node.js 22 package is pinned to Hyperliquid testnet:
+The separate `examples/testnet-agents` package is not part of the installed SDK
+archive. In the matching tagged repository, build the SDK first and then install
+that sibling example:
 
 ```bash
+# From omni-universe-sdks/packages/typescript in the cloned v0.8.3 source:
+npm ci
+npm run build
 cd ../../examples/testnet-agents
 npm ci
-npm run verify:live
-
-npm run example:momentum
-npm run example:mean-reversion
-npm run example:omni-risk:demo
+npm run typecheck
+npm run test:mcp
 ```
 
-The Omni-risk demo replaces paid research with a deterministic fixture but still reads the real Hyperliquid testnet market to construct a dry-run ALO order plan. It refuses `RUN_TESTNET_ORDERS=true`. Paid Omni research and the funded place/verify/cancel workflow are documented in the [testnet-agent guide](../../../examples/testnet-agents/README.md).
+The [testnet-agent source guide](https://github.com/InTheta/omni-universe-sdks/blob/v0.8.3/examples/testnet-agents/README.md)
+and [local MCP agent guide](https://github.com/InTheta/omni-universe-sdks/blob/v0.8.3/examples/testnet-agents/MCP_TRADING.md)
+provide exact scope and permission prerequisites. Their `verify:live` also runs a
+separately labelled signed unfunded-account probe; do not select it for an
+unsigned-only run. A paid Omni research purchase and a funded order lifecycle
+remain separately authorised operations.
+
+Installed archives include unsigned real research, guarded previews and an
+unsigned deterministic lifecycle/recovery runner under `dist-examples/`; use the
+[installed commands](installed-quickstarts.md) without cloning source or adding
+`tsx`.
 
 ## Troubleshooting
 
