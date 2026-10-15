@@ -275,3 +275,7 @@ npm audit --omit=dev
 - Coinbase Agentic Wallet MCP: https://docs.cdp.coinbase.com/agentic-wallet/mcp/quickstart
 - Robinhood Agentic Trading MCP: https://robinhood.com/us/en/support/articles/agentic-trading-overview/
 - Robinhood Crypto Trading API: https://docs.robinhood.com/crypto/trading/
+
+## Verified research and recovery agents
+
+See [research and payment recovery](docs/research-and-payment-recovery.md) for an unsigned live research workflow, explicit testnet paid prerequisites, aggregate/recipient bounds, cancellation, and deterministic recovery evidence. These additions target unreleased 0.8.1 source until the coordinated release.

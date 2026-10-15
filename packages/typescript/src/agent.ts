@@ -12,7 +12,22 @@ export function decideFromMarketRisk(
 ): AgentDecision {
   const minConfidence = policy.minConfidence ?? 0.72;
   const maxNotionalUsd = policy.maxNotionalUsd ?? 25;
+  for (const [name, value] of Object.entries({ minConfidence, maxNotionalUsd, maxAbsoluteHourlyFunding: policy.maxAbsoluteHourlyFunding ?? 0.001 })) {
+    if (!Number.isFinite(value) || value < 0 || (name === "minConfidence" && value > 1)) throw new RangeError(`Invalid decision policy: ${name}`);
+  }
+  const hold = (reason: string): AgentDecision => ({ symbol: risk.symbol, side: "HOLD", confidence: 0, rationale: [reason], maxNotionalUsd });
+  // Retrieved prose is untrusted evidence. Only bounded numeric fields influence this assessment;
+  // this function never authorizes account access, signing or execution.
+  for (const [name, freshness] of Object.entries({ market: risk.freshness, news: risk.news?.freshness, liquidations: risk.liquidations?.freshness, funding: risk.funding?.freshness })) {
+    if (!freshness || freshness.status !== "fresh") return hold(`${name} data is not fresh`);
+    const age = freshness.age_seconds;
+    const maximum = freshness.max_age_seconds;
+    if (typeof age === "number" && (!Number.isFinite(age) || age < 0 || typeof maximum !== "number" || !Number.isFinite(maximum) || age > maximum)) return hold(`${name} freshness age is invalid or expired`);
+  }
+  const fundingValue = risk.funding?.carry?.funding_rate_per_hour;
+  if (typeof fundingValue !== "number" || !Number.isFinite(fundingValue)) return hold("funding is unavailable");
   const events = risk.news.items ?? [];
+  if (events.some((event) => typeof event.confidence !== "number" || !Number.isFinite(event.confidence) || event.confidence < 0 || event.confidence > 1 || (typeof event.sentiment === "number" && !Number.isFinite(event.sentiment)))) return hold("invalid news evidence");
   const weighted = events.map((event) => {
     const sentiment = typeof event.sentiment === "number" ? clamp(event.sentiment / 10, -1, 1) : directionScore(event.direction);
     const confidence = typeof event.confidence === "number" ? event.confidence : 0;
@@ -20,7 +35,7 @@ export function decideFromMarketRisk(
   });
   const newsScore = weighted.length ? weighted.reduce((sum, value) => sum + value, 0) / weighted.length : 0;
   const confidence = Math.min(1, Math.abs(newsScore));
-  const funding = risk.funding?.carry?.funding_rate_per_hour ?? 0;
+  const funding = fundingValue;
   const maxFunding = policy.maxAbsoluteHourlyFunding ?? 0.001;
   const rationale = [
     `news_score=${newsScore.toFixed(4)}`,

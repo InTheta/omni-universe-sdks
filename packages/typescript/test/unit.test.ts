@@ -62,7 +62,7 @@ test("MCP paid tool arguments are rejected and normalized before payment", () =>
 test("MCP JSON helpers enforce product and settlement contracts", () => {
   const settlement = {
     success: true,
-    transaction: "0xabc",
+    transaction: `0x${"ab".repeat(32)}`,
     network: "eip155:8453",
   };
   const catalog = parseMcpToolJson<{ tools: unknown[] }>("get_market_catalog", {
@@ -82,7 +82,7 @@ test("MCP JSON helpers enforce product and settlement contracts", () => {
     paymentResponse: settlement,
   });
   assert.equal(carry.data.symbol, "BTC");
-  assert.equal(carry.payment?.transaction, "0xabc");
+  assert.equal(carry.payment?.transaction, `0x${"ab".repeat(32)}`);
 
   assert.throws(() => validateMcpToolResult("get_market_carry", {
     content: [{ type: "text", text: "{}" }],
@@ -181,7 +181,7 @@ test("x402 client accepts only successful, attributable settlement receipts", as
   };
   const settlement = {
     success: true,
-    transaction: "0xabc",
+    transaction: `0x${"ab".repeat(32)}`,
     network: "eip155:8453" as const,
   };
   let failed = false;
@@ -194,7 +194,7 @@ test("x402 client accepts only successful, attributable settlement receipts", as
     }),
   });
   const result = await client.marketCarry("BTC");
-  assert.equal(result.payment?.transaction, "0xabc");
+  assert.equal(result.payment?.transaction, `0x${"ab".repeat(32)}`);
   failed = true;
   await assert.rejects(client.marketCarry("BTC"), /settlement was not successful/);
 });
@@ -414,7 +414,7 @@ test("agent guardrails return HOLD below the confidence threshold", () => {
   const risk = {
     symbol: "BTC",
     news: { items: [{ direction: "bullish", sentiment: 4, confidence: 0.5 }] },
-    funding: { carry: { funding_rate_per_hour: 0.0001 } },
+    funding: { carry: { funding_rate_per_hour: 0.0001 }, freshness: { status: "fresh" } },
     freshness: { status: "fresh" },
   } as unknown as MarketRisk;
   assert.equal(decideFromMarketRisk(risk).side, "HOLD");
@@ -423,8 +423,9 @@ test("agent guardrails return HOLD below the confidence threshold", () => {
 test("agent reads the live x402 news.items schema and normalizes -10..10 sentiment", () => {
   const risk = {
     symbol: "BTC",
-    news: { items: [{ direction: "bullish", sentiment: 8, confidence: 0.95 }] },
-    funding: { carry: { funding_rate_per_hour: 0.0001 } },
+    news: { items: [{ direction: "bullish", sentiment: 8, confidence: 0.95 }], freshness: { status: "fresh" } },
+    liquidations: { freshness: { status: "fresh" } },
+    funding: { carry: { funding_rate_per_hour: 0.0001 }, freshness: { status: "fresh" } },
     freshness: { status: "fresh" },
   } as unknown as MarketRisk;
   const decision = decideFromMarketRisk(risk);

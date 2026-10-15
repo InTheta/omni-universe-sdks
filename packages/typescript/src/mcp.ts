@@ -40,7 +40,10 @@ export interface OmniMcpDataResult<T> {
 }
 
 export interface OmniMcpClientOptions {
+  timeoutMs?: number;
   maxPaymentAuthorizations?: number;
+  maxTotalPaymentUsd?: number;
+  allowedPayees?: readonly `0x${string}`[];
   allowedNetworks?: readonly ("eip155:84532" | "eip155:8453")[];
   url?: string;
   privateKey?: `0x${string}`;
@@ -53,17 +56,24 @@ export interface OmniMcpClientOptions {
 
 export class OmniMcpClient {
   private readonly client: x402MCPClient;
+  private readonly rawClient: Client;
   private readonly transport: StreamableHTTPClientTransport;
+  private readonly timeoutMs: number;
 
   constructor(options: OmniMcpClientOptions = {}) {
+    this.timeoutMs = options.timeoutMs ?? 30_000;
+    if (!Number.isSafeInteger(this.timeoutMs) || this.timeoutMs < 1) throw new RangeError("timeoutMs must be a positive safe integer");
     const rawClient = new Client({
       name: options.name ?? "omni-sdk-agent",
       version: options.version ?? SDK_VERSION,
     });
+    this.rawClient = rawClient;
     const paymentClient = options.privateKey
       ? createEvmPaymentClient(options.privateKey, {
         maxPaymentUsd: options.maxPaymentUsd ?? DEFAULT_MAX_X402_PAYMENT_USD,
         maxPaymentAuthorizations: options.maxPaymentAuthorizations,
+        maxTotalPaymentUsd: options.maxTotalPaymentUsd,
+        allowedPayees: options.allowedPayees,
         allowedNetworks: options.allowedNetworks,
       })
       : new x402Client();
@@ -82,23 +92,23 @@ export class OmniMcpClient {
     );
   }
 
-  async connect(): Promise<this> {
-    await this.client.connect(this.transport);
+  async connect(options: { signal?: AbortSignal } = {}): Promise<this> {
+    await this.rawClient.connect(this.transport, { timeout: this.timeoutMs, signal: options.signal });
     return this;
   }
 
-  listTools() {
-    return this.client.listTools();
+  listTools(options: { signal?: AbortSignal } = {}) {
+    return this.rawClient.listTools({}, { timeout: this.timeoutMs, signal: options.signal });
   }
 
-  async callTool(name: OmniMcpToolName, args: Record<string, unknown> = {}): Promise<x402MCPToolCallResult> {
-    const result = await this.client.callTool(name, validateMcpToolArguments(name, args));
+  async callTool(name: OmniMcpToolName, args: Record<string, unknown> = {}, options: { signal?: AbortSignal } = {}): Promise<x402MCPToolCallResult> {
+    const result = await this.client.callTool(name, validateMcpToolArguments(name, args), { timeout: this.timeoutMs, signal: options.signal, resetTimeoutOnProgress: false });
     validateMcpToolResult(name, result);
     return result;
   }
 
-  async callJsonTool<T>(name: OmniMcpToolName, args: Record<string, unknown> = {}): Promise<OmniMcpDataResult<T>> {
-    return parseMcpToolJson<T>(name, await this.callTool(name, args));
+  async callJsonTool<T>(name: OmniMcpToolName, args: Record<string, unknown> = {}, options: { signal?: AbortSignal } = {}): Promise<OmniMcpDataResult<T>> {
+    return parseMcpToolJson<T>(name, await this.callTool(name, args, options));
   }
 
   catalog(): Promise<x402MCPToolCallResult> {

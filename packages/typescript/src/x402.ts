@@ -1,3 +1,4 @@
+import { decodePaymentRequiredHeader } from "@x402/core/http";
 import { x402Client, x402HTTPClient } from "@x402/core/client";
 import { ExactEvmScheme } from "@x402/evm/exact/client";
 import { wrapFetchWithPayment } from "@x402/fetch";
@@ -34,11 +35,16 @@ export interface EvmPaymentClientOptions {
   maxPaymentAuthorizations?: number;
   /** Maximum USDC authorized for one Omni x402 call. USDC uses six decimal places. */
   maxPaymentUsd?: number;
+  /** Aggregate authorization ceiling for this instance. Holds are never released automatically after failures. */
+  maxTotalPaymentUsd?: number;
+  /** Explicit receivers; defaults to Omni. Custom sellers require deliberate allowlisting. */
+  allowedPayees?: readonly `0x${string}`[];
   allowedNetworks?: readonly ("eip155:84532" | "eip155:8453")[];
   allowedAssets?: Partial<Record<"eip155:84532" | "eip155:8453", readonly `0x${string}`[]>>;
 }
 
 export const DEFAULT_MAX_X402_PAYMENT_USD = 0.01;
+export const OMNI_X402_RECEIVER = "0x733f40A4FA0cd13d59aBADE04b9eD2e9acAc6457";
 export const OMNI_USDC_ASSETS = {
   "eip155:84532": ["0x036CbD53842c5426634e7929541eC2318f3dCF7e"],
   "eip155:8453": ["0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"],
@@ -57,20 +63,38 @@ export function createEvmPaymentClient(
   if (maxPaymentAuthorizations !== undefined && (!Number.isSafeInteger(maxPaymentAuthorizations) || maxPaymentAuthorizations < 1)) {
     throw new RangeError("maxPaymentAuthorizations must be a positive safe integer");
   }
+  const maxTotalAtomic = options.maxTotalPaymentUsd === undefined ? undefined : usdToUsdcAtomic(options.maxTotalPaymentUsd);
+  const allowedPayees = new Set((options.allowedPayees ?? [OMNI_X402_RECEIVER]).map((address) => {
+    if (!/^0x[0-9a-fA-F]{40}$/.test(address)) throw new RangeError("allowedPayees must contain EVM addresses");
+    return address.toLowerCase();
+  }));
+  let authorizedAtomic = 0n;
   let authorizations = 0;
   return new x402Client()
-    .onBeforePaymentCreation(async () => {
-      if (maxPaymentAuthorizations === undefined) return;
-      if (authorizations >= maxPaymentAuthorizations) return { abort: true, reason: "Payment authorization limit reached; reconcile before any new payment" };
+    .onBeforePaymentCreation(async ({ selectedRequirements }) => {
+      if (maxPaymentAuthorizations !== undefined && authorizations >= maxPaymentAuthorizations) {
+        return { abort: true, reason: "Payment authorization limit reached; reconcile before any new payment" };
+      }
+      const amount = BigInt(selectedRequirements.amount);
+      if (maxTotalAtomic !== undefined && authorizedAtomic + amount > maxTotalAtomic) {
+        return { abort: true, reason: "Aggregate payment authorization budget exceeded; reconcile before any new payment" };
+      }
+      // Synchronous reservation before signing is shared across concurrent HTTP/MCP calls.
+      // A lost response can already have settled; never release or retry that hold automatically.
+      authorizedAtomic += amount;
       authorizations++;
     })
     .register("eip155:*", new ExactEvmScheme(signer))
-    .registerPolicy((_version, requirements) => requirements.filter((requirement) => {
+    .registerPolicy((version, requirements) => requirements.filter((requirement) => {
+      if (version !== 2 || requirement.scheme !== "exact") return false;
+      if (!/^0x[0-9a-fA-F]{40}$/.test(requirement.payTo) || !allowedPayees.has(requirement.payTo.toLowerCase())) return false;
+      if (!Number.isSafeInteger(requirement.maxTimeoutSeconds) || requirement.maxTimeoutSeconds <= 0 || requirement.maxTimeoutSeconds > 3600) return false;
+      if (!/^[1-9][0-9]*$/.test(requirement.amount)) return false;
       const network = requirement.network as "eip155:84532" | "eip155:8453";
       if (!allowedNetworks.has(network)) return false;
       const networkAssets = allowedAssets.get(network);
       if (!networkAssets?.has(requirement.asset.toLowerCase())) return false;
-      try { return BigInt(requirement.amount) <= maxPaymentAtomic; }
+      try { const amount = BigInt(requirement.amount); return amount > 0n && amount <= maxPaymentAtomic; }
       catch { return false; }
     }));
 }
@@ -87,6 +111,7 @@ export class OmniX402Client {
   readonly timeoutMs: number;
   readonly paymentClient: x402Client;
   private readonly fetcher: typeof fetch;
+  private readonly rawFetcher: typeof fetch;
   private readonly httpPaymentClient: x402HTTPClient;
 
   constructor(options: OmniX402ClientOptions) {
@@ -94,7 +119,18 @@ export class OmniX402Client {
     this.timeoutMs = options.timeoutMs ?? 30_000;
     this.paymentClient = options.paymentClient;
     this.httpPaymentClient = new x402HTTPClient(options.paymentClient);
-    this.fetcher = wrapFetchWithPayment(options.fetch ?? globalThis.fetch, options.paymentClient);
+    this.rawFetcher = options.fetch ?? globalThis.fetch;
+    this.fetcher = wrapFetchWithPayment(async (input, init) => {
+      const response = await this.rawFetcher(input, init);
+      if (response.status === 402 && response.headers.has("payment-required")) {
+        const requestedUrl = input instanceof Request ? input.url : String(input);
+        const required = decodePaymentRequiredHeader(response.headers.get("payment-required")!);
+        if (required.x402Version !== 2 || required.resource?.url !== requestedUrl) {
+          throw new OmniContractError("Payment challenge is bound to a different resource", new URL(requestedUrl).pathname, undefined);
+        }
+      }
+      return response;
+    }, options.paymentClient);
   }
 
   async request<T>(
@@ -109,8 +145,10 @@ export class OmniX402Client {
   ): Promise<PaidResult<T>> {
     const headers = new Headers({ accept: "application/json" });
     if (options.body !== undefined) headers.set("content-type", "application/json");
-    const response = await this.fetcher(buildUrl(this.baseUrl, path, options.query), {
+    const transport = options.contract && options.contract.schema === undefined ? this.rawFetcher : this.fetcher;
+    const response = await transport(buildUrl(this.baseUrl, path, options.query), {
       method,
+      redirect: "error",
       headers,
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
       signal: mergeSignals(this.timeoutMs, options.signal),
@@ -130,6 +168,32 @@ export class OmniX402Client {
     }
     if (options.contract?.schema !== undefined) validatePaymentSettlement(path, payment);
     return { data, payment, requestId: response.headers.get("x-request-id") };
+  }
+
+  /** Read-only challenge inspection: never creates a payment or signs, even when a payer is configured. */
+  async inspectPayment(method: "GET" | "POST", path: string, options: {
+    query?: Record<string, QueryValue>; body?: unknown; signal?: AbortSignal;
+  } = {}): Promise<{ x402Version: 2; resource: { url: string }; accepts: Array<{
+    scheme: string; network: string; asset: string; amount: string; payTo: string; maxTimeoutSeconds: number;
+  }> }> {
+    const url = buildUrl(this.baseUrl, path, options.query);
+    if (url.origin !== new URL(this.baseUrl).origin || !url.pathname.startsWith("/api/x402/v1/")) {
+      throw new RangeError("Challenge inspection requires a same-origin Omni x402 product route");
+    }
+    const response = await this.rawFetcher(url, {
+      method, redirect: "error", signal: mergeSignals(this.timeoutMs, options.signal),
+      headers: { accept: "application/json", ...(options.body === undefined ? {} : { "content-type": "application/json" }) },
+      ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
+    });
+    const header = response.headers.get("payment-required");
+    if (response.status !== 402 || !header) throw new OmniContractError("Expected an x402 PAYMENT-REQUIRED challenge", path, { status: response.status });
+    let challenge;
+    try { challenge = decodePaymentRequiredHeader(header); }
+    catch { throw new OmniContractError("Invalid PAYMENT-REQUIRED challenge", path, undefined); }
+    if (challenge.x402Version !== 2 || challenge.resource?.url !== url.toString() || !Array.isArray(challenge.accepts) || challenge.accepts.length === 0) {
+      throw new OmniContractError("Payment challenge version/resource does not match the inspected request", path, undefined);
+    }
+    return challenge as { x402Version: 2; resource: { url: string }; accepts: Array<{ scheme: string; network: string; asset: string; amount: string; payTo: string; maxTimeoutSeconds: number }> };
   }
 
   newsHealth(): Promise<PaidResult<X402Health>> {
@@ -358,7 +422,7 @@ function validateProductContract(
   }
 }
 
-/** Fail closed unless an x402 settlement proves a successful on-chain payment. */
+/** Validate seller settlement metadata. Chain receipts must be independently reconciled for proof. */
 export function validatePaymentSettlement(route: string, payment: unknown): asserts payment is PaymentReceipt {
   if (!payment || typeof payment !== "object" || Array.isArray(payment)) {
     throw new OmniContractError(`Invalid payment settlement for ${route}: expected an object`, route, payment);
@@ -367,10 +431,10 @@ export function validatePaymentSettlement(route: string, payment: unknown): asse
   if (record.success !== true) {
     throw new OmniContractError(`Invalid payment settlement for ${route}: settlement was not successful`, route, payment);
   }
-  if (typeof record.transaction !== "string" || record.transaction.length === 0) {
+  if (typeof record.transaction !== "string" || !/^0x[0-9a-fA-F]{64}$/.test(record.transaction)) {
     throw new OmniContractError(`Invalid payment settlement for ${route}: missing transaction`, route, payment);
   }
-  if (typeof record.network !== "string" || record.network.length === 0) {
+  if (record.network !== "eip155:8453" && record.network !== "eip155:84532") {
     throw new OmniContractError(`Invalid payment settlement for ${route}: missing network`, route, payment);
   }
 }

@@ -121,7 +121,7 @@ test("one-shot payment client rejects recovery/retry authorization, including co
     resource: { url: "https://example.test/paid" },
     accepts: [{ scheme: "exact", network: "eip155:84532" as const,
       asset: OMNI_USDC_ASSETS["eip155:84532"][0], amount: "1000",
-      payTo: "0x0000000000000000000000000000000000000002", maxTimeoutSeconds: 60,
+      payTo: "0x733f40A4FA0cd13d59aBADE04b9eD2e9acAc6457", maxTimeoutSeconds: 60,
       extra: { name: "USDC", version: "2" } }],
   };
   const results = await Promise.allSettled([
@@ -147,7 +147,7 @@ test("payment assets are captured at construction, not widened by caller/default
       x402Version: 2, resource: { url: "https://example.test/paid" },
       accepts: [{ scheme: "exact", network: "eip155:84532" as const,
         asset: extraAsset, amount: "1000",
-        payTo: "0x0000000000000000000000000000000000000002", maxTimeoutSeconds: 60,
+        payTo: "0x733f40A4FA0cd13d59aBADE04b9eD2e9acAc6457", maxTimeoutSeconds: 60,
         extra: { name: "USDC", version: "2" } }],
     };
     await assert.rejects(paymentClient.createPaymentPayload(challenge));
