@@ -1,6 +1,6 @@
 # Research and payment recovery agents
 
-For v0.8.3 installed-package commands requiring no development dependencies, use [installed SDK quickstarts](installed-quickstarts.md). The source-checkout commands below require `npm ci && npm run build` in `packages/typescript`. Historical v0.8.0 does not contain these APIs.
+For v0.8.4 installed-package commands requiring no development dependencies, use [installed SDK quickstarts](installed-quickstarts.md). The source-checkout commands below require `npm ci && npm run build` in `packages/typescript`. Historical v0.8.0 does not contain these APIs.
 
 ## Free real research agent
 

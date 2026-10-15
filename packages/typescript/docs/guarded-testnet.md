@@ -1,6 +1,6 @@
 # Guarded Hyperliquid testnet execution
 
-`GuardedTestnetExecutor` is included in v0.8.3. Use [installed SDK quickstarts](installed-quickstarts.md) for compiled JavaScript examples with no development dependencies, or build the matching tagged source. Historical v0.8.0 does **not** export this API.
+`GuardedTestnetExecutor` is included in v0.8.4. Use [installed SDK quickstarts](installed-quickstarts.md) for compiled JavaScript examples with no development dependencies, or build the matching tagged source. Historical v0.8.0 does **not** export this API.
 
 Migration: v0.8.1 requires Node >=22.12; the execution dependency raises the previous Node >=20.19 minimum. Historical v0.8.0 consumers retain their published runtime contract. Upgrade Node before upgrading the SDK.
 
@@ -13,7 +13,7 @@ npm run build
 npm pack
 ```
 
-To test the actual package boundary, create a clean directory, `npm init -y`, and `npm install /absolute/path/omni-terminal-sdk-0.8.3.tgz`. Import exclusively from `@omni-terminal/sdk`. Its execution client uses the pinned public `@nktkas/hyperliquid` SDK. Neither client sends private keys to Omni or MCP servers; a local MCP adapter must remain under the signer's control.
+To test the actual package boundary, create a clean directory, `npm init -y`, and `npm install /absolute/path/omni-terminal-sdk-0.8.4.tgz`. Import exclusively from `@omni-terminal/sdk`. Its execution client uses the pinned public `@nktkas/hyperliquid` SDK. Neither client sends private keys to Omni or MCP servers; a local MCP adapter must remain under the signer's control.
 
 For the included runner set the **exact** testnet account and validator perpetual symbol:
 

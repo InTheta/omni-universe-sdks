@@ -1,6 +1,6 @@
 {
   "name": "@omni-terminal/sdk",
-  "version": "0.8.3",
+  "version": "0.8.4",
   "description": "Public TypeScript SDK for Omni AI News, x402/MCP analytics, and direct Hyperliquid market data",
   "type": "module",
   "main": "./dist/index.js",

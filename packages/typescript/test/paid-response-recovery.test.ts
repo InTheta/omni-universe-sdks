@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { inspect } from "node:util";
 import { x402Client } from "@x402/core/client";
+import { x402ResourceServer } from "@x402/core/server";
 import { encodePaymentRequiredHeader, encodePaymentResponseHeader } from "@x402/core/http";
 import { OmniX402Client, OmniApiError, OmniContractError } from "../src/index.js";
 
@@ -131,4 +132,72 @@ test("public generic auto-paying request retains reconciliation flags when recei
     return true;
   });
   assert.equal(calls, 1);
+});
+
+
+const verificationReasons = [
+  "invalid_exact_evm_payload_authorization_valid_before", "invalid_exact_evm_payload_authorization_valid_after",
+  "invalid_exact_evm_signature", "invalid_exact_evm_payload_authorization_value_mismatch",
+  "invalid_exact_evm_recipient_mismatch", "invalid_exact_evm_network_mismatch", "invalid_exact_evm_nonce_already_used",
+  "invalid_exact_evm_insufficient_balance", "invalid_exact_evm_transaction_simulation_failed",
+  "asset_not_deployed_contract", "invalid_exact_evm_scheme", "invalid_exact_evm_missing_eip712_domain",
+];
+const rejectionRequirements = { scheme: "exact", network: "eip155:84532" as const,
+  asset: "0x036CbD53842c5426634e7929541eC2318f3dCF7e", amount: "1000",
+  payTo: "0x0000000000000000000000000000000000000002", maxTimeoutSeconds: 300, extra: { name: "USDC", version: "2" } };
+const rejectionResource = { url: "https://offline.invalid/api/x402/v1/news" };
+
+test("public paid requests preserve official verification reasons from gateway-shaped v2 headers without retrying", async () => {
+  const server = new x402ResourceServer();
+  const sentinel = "SYNTHETIC_UNKNOWN_REJECTION_SENTINEL";
+  for (const reason of [...verificationReasons, sentinel]) {
+    let calls = 0, fixturePayloads = 0;
+    // An unsigned fixture mechanism exercises the HTTP handshake without any signer or network.
+    const payer = new x402Client().register("eip155:*", { scheme: "exact", createPaymentPayload: async () => {
+      fixturePayloads++;
+      return { x402Version: 2, payload: { fixture: "unsigned deterministic payload" } };
+    } });
+    const challenge = await server.createPaymentRequiredResponse([rejectionRequirements], rejectionResource);
+    const rejected = await server.createPaymentRequiredResponse([rejectionRequirements], rejectionResource, reason);
+    const client = new OmniX402Client({ baseUrl: "https://offline.invalid", paymentClient: payer, fetch: async () => {
+      calls++;
+      assert(calls <= 2);
+      // Official server middleware puts the reason in PAYMENT-REQUIRED.error and sends an empty JSON body.
+      return Response.json({}, { status: 402, headers: { "payment-required": encodePaymentRequiredHeader(calls === 1 ? challenge : rejected) } });
+    } });
+    await assert.rejects(client.request("GET", "/api/x402/v1/news"), error => {
+      assert(error instanceof OmniApiError);
+      assert.equal(error.code, reason === sentinel ? "HTTP_ERROR" : reason);
+      for (const rendered of [String(error), inspect(error), JSON.stringify(error)]) assert(!rendered.includes(sentinel));
+      assert.equal(error.cause, undefined);
+      assert.equal(error.status, 402);
+      assertRecovery(error);
+      return true;
+    });
+    assert.equal(calls, 2);
+    assert.equal(fixturePayloads, 1);
+  }
+});
+
+test("error header decoding is bounded, v2-only, finite and redacted with explicit body precedence", () => {
+  const sentinel = "SYNTHETIC_UNTRUSTED_REJECTION_SENTINEL";
+  const known = "invalid_exact_evm_nonce_already_used";
+  const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64");
+  for (const header of [undefined, "%%%" + sentinel, encode({ x402Version: 2, error: sentinel }),
+    encode({ x402Version: 1, error: known }), encode({ x402Version: "2", error: known }),
+    encode({ x402Version: 2, error: { detail: known } }), encode(null),
+    encode({ x402Version: 2, error: known, ignored: sentinel.repeat(1000) })]) {
+    const response = Response.json({}, { status: 402, headers: header ? { "payment-required": header } : {} });
+    const error = new OmniApiError("Request failed", 402, response, {});
+    assert.equal(error.code, "HTTP_ERROR");
+    for (const rendered of [String(error), inspect(error), JSON.stringify(error)]) assert(!rendered.includes(sentinel));
+    assert.equal(error.cause, undefined);
+  }
+  const header = encode({ x402Version: 2, error: known });
+  assert.equal(new OmniApiError("Request failed", 402, Response.json({}, { status: 402, headers: { "payment-required": header } }), { error: "rate_limited" }).code, "rate_limited");
+  assert.equal(new OmniApiError("Request failed", 402, Response.json({}, { status: 402, headers: { "payment-required": header } }), { error: sentinel }).code, known);
+  assert.equal(new OmniApiError("Request failed", 500, Response.json({}, { status: 500, headers: { "payment-required": header } }), {}).code, "HTTP_ERROR");
+  for (const legacy of ["invalid_exact_evm_payload_signature", "invalid_exact_evm_payload_recipient_mismatch"]) {
+    assert.equal(new OmniApiError("Request failed", 402, Response.json({}, { status: 402 }), { error: legacy }).code, legacy);
+  }
 });

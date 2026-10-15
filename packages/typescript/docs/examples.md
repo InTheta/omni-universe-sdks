@@ -5,13 +5,13 @@ For an installed archive with no development dependencies, start with [installed
 ## Install
 
 ```bash
-git clone --branch v0.8.3 https://github.com/InTheta/omni-universe-sdks.git
+git clone --branch v0.8.4 https://github.com/InTheta/omni-universe-sdks.git
 cd omni-universe-sdks/packages/typescript
 npm ci
 npm run verify
 ```
 
-Node.js 22.12 or newer is required for v0.8.3. Every `npm run example:*` command loads `.env` when present; values already injected into the process environment take precedence.
+Node.js 22.12 or newer is required for v0.8.4. Every `npm run example:*` command loads `.env` when present; values already injected into the process environment take precedence.
 
 ## Start with the no-spend demos
 
@@ -125,7 +125,7 @@ archive. In the matching tagged repository, build the SDK first and then install
 that sibling example:
 
 ```bash
-# From omni-universe-sdks/packages/typescript in the cloned v0.8.3 source:
+# From omni-universe-sdks/packages/typescript in the cloned v0.8.4 source:
 npm ci
 npm run build
 cd ../../examples/testnet-agents
@@ -134,8 +134,8 @@ npm run typecheck
 npm run test:mcp
 ```
 
-The [testnet-agent source guide](https://github.com/InTheta/omni-universe-sdks/blob/v0.8.3/examples/testnet-agents/README.md)
-and [local MCP agent guide](https://github.com/InTheta/omni-universe-sdks/blob/v0.8.3/examples/testnet-agents/MCP_TRADING.md)
+The [testnet-agent source guide](https://github.com/InTheta/omni-universe-sdks/blob/v0.8.4/examples/testnet-agents/README.md)
+and [local MCP agent guide](https://github.com/InTheta/omni-universe-sdks/blob/v0.8.4/examples/testnet-agents/MCP_TRADING.md)
 provide exact scope and permission prerequisites. Their `verify:live` also runs a
 separately labelled signed unfunded-account probe; do not select it for an
 unsigned-only run. A paid Omni research purchase and a funded order lifecycle
