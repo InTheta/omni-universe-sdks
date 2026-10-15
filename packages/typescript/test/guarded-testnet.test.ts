@@ -143,3 +143,43 @@ test("IOC fill and reduction reconcile only own flat-baseline fills (determinist
     assert.equal(orderCount, 3);
   } finally { globalThis.fetch = original; }
 });
+
+test("exact-order cancellation survives stale and unavailable L2 feeds, including delisted metadata", async () => {
+  const original = globalThis.fetch;
+  const wallet = privateKeyToAccount(generatePrivateKey());
+  try {
+    for (const l2Mode of ["stale", "outage"] as const) {
+      let canceled = false, l2Calls = 0, cancelWrites = 0;
+      const cloid = `0x${"ab".repeat(16)}` as `0x${string}`;
+      globalThis.fetch = async (url, options) => {
+        assert.equal(new URL(String(url)).origin, "https://api.hyperliquid-testnet.xyz");
+        const body = JSON.parse(String(options?.body));
+        if (String(url).endsWith("/exchange")) {
+          assert.deepEqual(body.action, { type: "cancelByCloid", cancels: [{ asset: 1, cloid }] });
+          canceled = true; cancelWrites++;
+          return Response.json({status: "ok", response: {type: "cancel", data: {statuses: ["success"]}}});
+        }
+        if (body.type === "l2Book") {
+          l2Calls++;
+          if (l2Mode === "outage") throw new Error("fixture L2 outage");
+          return Response.json({coin: "BTC", time: Date.now() - 30_000, levels: [[], []]});
+        }
+        const fixtures: Record<string, unknown> = {
+          meta: {universe: [{name: "ETH", szDecimals: 4}, {name: "BTC", szDecimals: 5, isDelisted: true}]},
+          orderStatus: {status: "order", order: {order: {coin: "BTC", cloid, oid: 789}, status: canceled ? "canceled" : "open"}},
+          userFillsByTime: [], clearinghouseState: {withdrawable: "100", assetPositions: []}, maxBuilderFee: 25,
+        };
+        assert.ok(body.type in fixtures, `unexpected method ${body.type}`);
+        return Response.json(fixtures[body.type]);
+      };
+      const executor = new GuardedTestnetExecutor({ accountAddress: wallet.address, symbol: "BTC", maxNotionalUsd: 15, builderFeeTenthsBps: 25, enabled: true, signer: wallet, persist: async () => {}, loadPendingJournals: async () => [] });
+      const journal: Parameters<typeof executor.cancel>[0] = { plan: {network: "hyperliquid-testnet", accountAddress: wallet.address, symbol: "BTC", asset: 1, side: "BUY", price: "98000", size: "0.00015", notionalUsd: 14.7, createdAt: Date.now()-1000, expiresAt: Date.now()+1000, cloid, tif: "Alo", reduceOnly: false, builder: {b: "0x733f40a4fa0cd13d59abade04b9ed2e9acac6457", f: 25}}, stage: "submitted", startedAt: Date.now()-1000 };
+      assert.equal((await executor.cancel(journal)).complete, true);
+      assert.equal(cancelWrites, 1);
+      assert.equal(l2Calls, 0, `${l2Mode} L2 must not gate cancellation`);
+      canceled = false;
+      await assert.rejects(executor.cancel({...journal, plan: {...journal.plan, asset: 0}}), /asset scope mismatch/);
+      assert.equal(cancelWrites, 1, "wrong persisted asset must never reach exchange");
+    }
+  } finally { globalThis.fetch = original; }
+});

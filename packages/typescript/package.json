@@ -25,7 +25,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.examples.json --noEmit",
-    "test": "node --import tsx --test test/unit.test.ts test/boundary.test.ts test/agents.test.ts test/bundle-budget.test.ts test/x402-hardening.test.ts test/guarded-testnet.test.ts test/guarded-rejection.test.ts test/error-redaction.test.ts test/reconciliation-report.test.ts",
+    "test": "node --import tsx --test test/unit.test.ts test/boundary.test.ts test/agents.test.ts test/bundle-budget.test.ts test/x402-hardening.test.ts test/guarded-testnet.test.ts test/guarded-rejection.test.ts test/error-redaction.test.ts test/screenshots.test.ts test/guarded-runner.test.ts test/reconciliation-report.test.ts",
     "test:agents": "node --import tsx --test test/agents.test.ts",
     "test:examples": "npm run example:news-ws:demo && npm run example:agentic-flow:demo && npm run example:ask-omni:demo && npm run example:coinbase:demo && npm run example:robinhood:demo",
     "test:live": "node --import tsx --test test/live.test.ts",

@@ -210,10 +210,15 @@ export class GuardedTestnetExecutor {
     if (state.status === "unknownOid") throw new Error("UNCERTAIN_ORDER: not indexed; do not resubmit");
     if (state.order.order.coin !== this.#policy.symbol || state.order.order.cloid !== journal.plan.cloid) throw new Error("Authoritative order scope mismatch");
     if (state.order.status === "open") {
+      // Cancellation must remain available during stale or unavailable market-data feeds.
+      // Resolve the exact validator asset afresh; never trust a persisted asset index alone.
+      // Delisted metadata is retained so its outstanding orders can still be canceled.
+      const metadata = await this.#info.meta();
+      const matches = metadata.universe.flatMap((item, asset) => item.name === this.#policy.symbol ? [asset] : []);
+      if (matches.length !== 1 || !Number.isSafeInteger(journal.plan.asset) || matches[0] !== journal.plan.asset) throw new Error("Authoritative cancellation asset scope mismatch");
       journal.stage = "cancel_requested";
       await this.#policy.persist(structuredClone(journal));
-      const market = await this.market();
-      await exchange.cancelByCloid({ cancels: [{ asset: market.asset, cloid: journal.plan.cloid }] });
+      await exchange.cancelByCloid({ cancels: [{ asset: matches[0]!, cloid: journal.plan.cloid }] });
     }
     for (let attempt = 0; attempt < 8; attempt++) {
       const result = await this.reconcile(journal);

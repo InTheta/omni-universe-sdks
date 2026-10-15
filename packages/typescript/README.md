@@ -32,8 +32,8 @@ version or price recorded in this guide.
 
 The v0.8.0 artifact contains nine JSON product helpers and does not include
 `premarketRoundup()`, `premarketRoundupData()`, the forced-free `:free` scripts,
-or newer verification/demo commands. The ten-product examples below describe
-current source. Installing the tarball into a consumer project does not install
+or newer verification/demo commands. The thirteen-product HTTP examples below describe
+current source, including the three new PNG helpers. Installing the tarball into a consumer project does not install
 repository test commands; use the source checkout for those.
 
 For source development, start at a fresh checkout (Node.js 22.12+):
@@ -140,7 +140,7 @@ connection and reconcile missed history through REST. Iterator values include
 the envelope and payload timestamps before treating a frame as fresh news. The
 `ws-news` example stops after five received frames, not five verified news events.
 
-## x402 REST — all ten paid JSON routes
+## x402 REST — ten JSON products and three PNG products
 
 ```ts
 import { createEvmPaymentClient, OmniX402Client } from "@omni-terminal/sdk";
@@ -165,6 +165,9 @@ const { data, payment } = await paid.marketRisk("BTC", { scope: "current", limit
 | `POST /api/x402/v1/symbols/resolve` | `resolveSymbols()` |
 | `GET /api/x402/v1/market-carry/{symbol}` | `marketCarry()` |
 | `GET /api/x402/v1/research/premarket` | `premarketRoundup()` |
+| `GET /api/x402/v1/screenshots/liquidation-levels/{symbol}` | `liquidationLevelsScreenshot()` |
+| `GET /api/x402/v1/screenshots/liquidation-bucket/{symbol}` | `liquidationBucketScreenshot()` |
+| `GET /api/x402/v1/screenshots/trader-profile/{address}` | `traderProfileScreenshot()` |
 
 Paid methods return contract-shaped TypeScript objects. They validate runtime symbols, addresses, limits, filters, timestamps, and entity batches before invoking the payment-aware fetch layer, then verify product service/schema discriminants and require a successful `PAYMENT-RESPONSE` settlement with a transaction and network. Invalid requests cannot trigger avoidable payment attempts, and response or settlement-contract drift fails closed.
 
@@ -172,13 +175,26 @@ Paid methods return contract-shaped TypeScript objects. They validate runtime sy
 `premarketRoundup({ date: "2026-08-11" })` for an exact publication date, or include
 `limit: 1..5`. The numeric form, such as `premarketRoundup(1)`, remains supported.
 
+PNG methods return `PaidResult<ScreenshotPng>` with `data.bytes` (`Uint8Array`),
+`data.byteLength`, and `data.contentType`. They enforce the PNG signature and a
+4 MiB streamed byte budget, cancel oversized responses, and require successful
+settlement metadata. `maxScreenshotBytes` may be explicitly set up to 16 MiB;
+`screenshotTimeoutMs` defaults to 150 seconds (maximum 180 seconds). The byte and
+time limits do not widen any payment budget. Receipt metadata still requires
+independent on-chain reconciliation. A malformed response may already have
+settled; never automatically purchase it again.
+
 Start with `npm run example:x402:free`; it forces only the two free health calls,
-even when paid flags are inherited. The deliberately armed source example
-`example:x402` attempts eleven purchases across ten JSON products, including
-both latest and dated pre-market roundup queries. The current roundup challenge
-is $0.100 and is rejected by the default $0.010 per-call cap. Do not raise the cap
-merely to make an all-routes run pass: approve an exact product and aggregate
-budget first. Uncertain settlement requires reconciliation before retry.
+even when paid flags are inherited. The armed source example buys each of the
+13 HTTP products once on Base Sepolia, at most 0.182 test USDC total and 0.100 per
+request. It requires `RUN_PAID_EXAMPLES=true`,
+`X402_CONFIRM_TESTNET_BUDGET=0.182`, a current published `X402_BUCKET_PRICE`, and a
+new `X402_RUN_STATE` journal path. The five-tool MCP example uses a separate
+0.124 confirmation and a new journal. Both stop on a failure, retain conservative
+authorization holds, and write request-start/receipt metadata without proofs.
+Reconcile that journal before preparing any new approved run. The generic SDK
+per-call default remains 0.010; these complete examples require explicit approval
+for their larger aggregate and research ceilings.
 
 ## MCP — every tool
 
