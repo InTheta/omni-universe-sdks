@@ -8,7 +8,7 @@ Public SDKs, connection examples, market-data integrations, and guarded trading-
 
 | SDK | Status | Runtime | Coverage |
 | --- | --- | --- | --- |
-| [TypeScript](packages/typescript) | Source `0.8.1` (unreleased) | Node.js 20.19+ | Omni API-key REST/WS, x402 REST, x402 MCP, direct Hyperliquid REST/WS, Coinbase and Robinhood agent examples |
+| [TypeScript](packages/typescript) | Source `0.8.1` (unreleased) | Node.js 22.12+ | Omni API-key REST/WS, x402 REST, x402 MCP, direct Hyperliquid REST/WS, Coinbase and Robinhood agent examples |
 
 The TypeScript package is source-available here and produces `@omni-terminal/sdk`. Publishing to the npm registry is a separate release step and has not been performed yet.
 
@@ -38,7 +38,7 @@ Public Hyperliquid reads go directly to Hyperliquid. Omni API keys are used only
 | [Runnable example runbook](packages/typescript/docs/examples.md) | Every command, safe demo, required credential, side effect and expected completion behavior |
 | [Coinbase and Robinhood agent guide](packages/typescript/docs/trading-agents.md) | Complete setup, data flow, credentials, dry runs, live gates, custom agents and test matrix |
 | [Agentic trading zero-to-one](packages/typescript/docs/agentic-trading-0-to-1.md) | Coinbase Agentic Wallet x402 discovery/payment, Omni evidence, Robinhood Trading MCP, and runnable broker adapters |
-| [Ask Omni research bundles](packages/typescript/docs/ask-omni-bundles.md) | Agentic Market-style 0.016-0.040 USDC recipes combining the published roundup, live MCP tools, HTTP products, receipts, and broker handoff |
+| [Ask Omni research bundles](packages/typescript/docs/ask-omni-bundles.md) | Agentic Market-style 0.120-0.144 USDC recipes combining the published roundup, live MCP tools, HTTP products, receipts, and broker handoff |
 | [Hyperliquid testnet agents](examples/testnet-agents/README.md) | Momentum, mean-reversion and Omni risk agents with a capped place/verify/cancel lifecycle |
 | [Security policy](SECURITY.md) | Private reporting and production credential guidance |
 
@@ -50,7 +50,7 @@ Public Hyperliquid reads go directly to Hyperliquid. Omni API keys are used only
 | [Direct Hyperliquid WebSocket](packages/typescript/examples/ws-market.ts) | `npm run example:ws` | Public market-data stream |
 | [Omni AI News WebSocket](packages/typescript/examples/ws-news.ts) | `npm run example:news-ws` | Requires an Omni API key and ticket |
 | Omni AI News offline demo | `npm run example:news-ws:demo` | No network or credentials |
-| [All ten x402 JSON products](packages/typescript/examples/x402-all-routes.ts) | `npm run example:x402` | Free health only; no payment by default |
+| [All 13 x402 HTTP products](packages/typescript/examples/x402-all-routes.ts) | `npm run example:x402` | Free health only; no payment by default |
 | [All MCP tools](packages/typescript/examples/mcp-all-tools.ts) | `npm run example:mcp` | Free catalog; five paid tools require explicit setup |
 | [Ask Omni bundle](packages/typescript/examples/agents/ask-omni-bundle.ts) | `npm run example:ask-omni:demo` | Full bundle plan and deterministic no-spend output; paid mode is separately armed |
 | [Coinbase agent](packages/typescript/examples/agents/coinbase-agent.ts) | `npm run example:coinbase` | One call, or dual x402 REST + MCP evidence; preview only |
