@@ -54,6 +54,21 @@ export interface OmniMcpClientOptions {
   version?: string;
 }
 
+/** Safe wrapper boundary: protocol messages/data can contain echoed payment proofs. */
+export class OmniMcpProtocolError extends Error {
+  readonly code: number | null;
+  readonly operation: "connect" | "listTools" | "callTool" | "close";
+  constructor(operation: OmniMcpProtocolError["operation"], error: unknown) {
+    const candidate = error && typeof error === "object" ? error as { code?: unknown; name?: unknown } : undefined;
+    const cancelled = candidate?.name === "AbortError";
+    const timeout = candidate?.name === "TimeoutError";
+    super(`MCP ${operation} ${cancelled ? "was cancelled" : timeout ? "timed out" : "failed"}; reconcile any uncertain payment before retrying`);
+    this.name = cancelled ? "AbortError" : timeout ? "TimeoutError" : "OmniMcpProtocolError";
+    this.operation = operation;
+    this.code = typeof candidate?.code === "number" && Number.isSafeInteger(candidate.code) ? candidate.code : null;
+  }
+}
+
 export class OmniMcpClient {
   private readonly client: x402MCPClient;
   private readonly rawClient: Client;
@@ -93,16 +108,21 @@ export class OmniMcpClient {
   }
 
   async connect(options: { signal?: AbortSignal } = {}): Promise<this> {
-    await this.rawClient.connect(this.transport, { timeout: this.timeoutMs, signal: options.signal });
+    try { await this.rawClient.connect(this.transport, { timeout: this.timeoutMs, signal: options.signal }); }
+    catch (error) { throw new OmniMcpProtocolError("connect", error); }
     return this;
   }
 
-  listTools(options: { signal?: AbortSignal } = {}) {
-    return this.rawClient.listTools({}, { timeout: this.timeoutMs, signal: options.signal });
+  async listTools(options: { signal?: AbortSignal } = {}) {
+    try { return await this.rawClient.listTools({}, { timeout: this.timeoutMs, signal: options.signal }); }
+    catch (error) { throw new OmniMcpProtocolError("listTools", error); }
   }
 
   async callTool(name: OmniMcpToolName, args: Record<string, unknown> = {}, options: { signal?: AbortSignal } = {}): Promise<x402MCPToolCallResult> {
-    const result = await this.client.callTool(name, validateMcpToolArguments(name, args), { timeout: this.timeoutMs, signal: options.signal, resetTimeoutOnProgress: false });
+    const validated = validateMcpToolArguments(name, args);
+    let result: x402MCPToolCallResult;
+    try { result = await this.client.callTool(name, validated, { timeout: this.timeoutMs, signal: options.signal, resetTimeoutOnProgress: false }); }
+    catch (error) { throw new OmniMcpProtocolError("callTool", error); }
     validateMcpToolResult(name, result);
     return result;
   }
@@ -160,7 +180,8 @@ export class OmniMcpClient {
   }
 
   async close(): Promise<void> {
-    await this.client.close();
+    try { await this.client.close(); }
+    catch (error) { throw new OmniMcpProtocolError("close", error); }
   }
 }
 

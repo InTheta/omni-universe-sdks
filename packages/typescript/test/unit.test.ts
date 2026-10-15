@@ -572,3 +572,50 @@ test("x402 buyer rejects a non-USDC asset even below the price ceiling", async (
     }],
   }));
 });
+
+
+test("MCP wrapper drops adversarial protocol error messages and data over actual HTTP transport", async () => {
+  const { createServer } = await import("node:http");
+  const { inspect } = await import("node:util");
+  const { OmniMcpClient, OmniMcpProtocolError } = await import("../src/mcp.js");
+  const marker = "FAKE_PROOF_SHOULD_NEVER_ESCAPE_PROTOCOL_ERROR";
+  for (const failure of ["initialize", "tools/list", "tools/call"] as const) {
+    const server = createServer(async (request, response) => {
+      if (request.method !== "POST") { response.writeHead(405).end(); return; }
+      let body = "";
+      for await (const chunk of request) body += String(chunk);
+      const message = JSON.parse(body);
+      if (message.id === undefined) { response.writeHead(202).end(); return; }
+      response.writeHead(200, { "content-type": "application/json" });
+      const result = message.method === failure
+        ? { error: { code: -32603, message: marker, data: { paymentSignature: marker, nested: { authorization: marker } } } }
+        : { result: { protocolVersion: "2025-03-26", capabilities: { tools: {} }, serverInfo: { name: "fixture", version: "1" } } };
+      response.end(JSON.stringify({ jsonrpc: "2.0", id: message.id, ...result }));
+    });
+    await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address() as { port: number };
+    const client = new OmniMcpClient({ url: `http://127.0.0.1:${address.port}/mcp` });
+    try {
+      await assert.rejects(async () => {
+        await client.connect();
+        if (failure === "tools/list") await client.listTools();
+        if (failure === "tools/call") await client.catalog();
+      }, error => {
+        assert(error instanceof OmniMcpProtocolError);
+        assert.equal(error.code, -32603);
+        for (const rendered of [String(error), inspect(error), JSON.stringify(error)]) assert(!rendered.includes(marker));
+        assert.equal((error as Error).cause, undefined);
+        return true;
+      });
+    } finally {
+      await client.close();
+      await new Promise<void>(resolve => server.close(() => resolve()));
+    }
+  }
+  for (const name of ["AbortError", "TimeoutError"]) {
+    const error = new OmniMcpProtocolError("callTool", Object.assign(new Error(marker), { name, data: marker }));
+    assert.equal(error.name, name);
+    assert.equal(error.code, null);
+    assert(!inspect(error).includes(marker));
+  }
+});

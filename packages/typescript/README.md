@@ -283,3 +283,13 @@ See [research and payment recovery](docs/research-and-payment-recovery.md) for a
 ## Error-handling migration in the source-only v0.8.1 update
 
 HTTP and contract errors no longer expose raw seller response bodies or seller-supplied error text through `message` or `details`. These responses can contain untrusted content, credentials, or reusable payment proofs. Handle the SDK's allowlisted `.code`, HTTP `.status`, and sanitized `.requestId` / `.retryAfter` fields instead of parsing upstream prose or logging response payloads. Unknown seller error codes are omitted. This migration applies when upgrading to this source build; it is not a claim about the currently published v0.8.0 package.
+### MCP protocol errors
+
+`OmniMcpClient` wraps connection, tool-listing, tool-call and close failures in
+`OmniMcpProtocolError`. Only the operation and numeric protocol error code are
+retained; untrusted server messages, data and causes are discarded because they
+may echo payment proofs. Cancellation and timeout error names are preserved.
+An error is not proof that a payment was never settled: reconcile an uncertain
+payment before approving another attempt. This guarantee applies to Omni's
+wrapper; direct use of the raw `@modelcontextprotocol/sdk` client requires its
+own error redaction and must not log arbitrary exception data.
