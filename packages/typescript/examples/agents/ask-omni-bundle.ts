@@ -35,7 +35,7 @@ if (!paid) {
       execution: "No order was previewed or placed.",
     },
   }, null, 2));
-  console.log("No payment was made. Set RUN_PAID_ASK_OMNI_BUNDLE=yes and a dedicated EVM_PRIVATE_KEY to run live.");
+  console.log("No payment was made. Current complete bundles exceed this example's unchanged 0.050-USDC ceiling; paid mode is blocked before purchase. See docs/ask-omni-bundles.md for integration prerequisites.");
   process.exit(0);
 }
 const privateKey = process.env.EVM_PRIVATE_KEY as `0x${string}` | undefined;

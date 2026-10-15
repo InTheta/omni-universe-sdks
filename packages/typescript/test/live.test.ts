@@ -35,11 +35,17 @@ test("x402 MCP initializes and serves the free catalog", async () => {
       "get_market_risk_context",
       "resolve_market_entities",
       "get_market_carry",
+      "get_premarket_roundup",
     ]) assert.ok(names.has(expected), `MCP tool missing: ${expected}`);
     const result = await client.catalogData();
     assert.equal(result.payment, null);
     assert.equal(result.data.service, "omni-market-intelligence");
-    assert.equal(result.data.tools.length, 4);
+    assert.equal(result.data.tools.length, 5);
+    assert.deepEqual(
+      result.data.tools.map((tool) => tool.name).sort(),
+      [...names].filter((name) => name !== "get_market_catalog").sort(),
+      "Free catalog and tool discovery must describe the same paid tools",
+    );
   } finally {
     await client.close();
   }
@@ -88,6 +94,10 @@ test("published OpenAPI contracts retain the SDK route boundary", async () => {
     "/api/x402/v1/market-snapshot/{symbol}",
     "/api/x402/v1/symbols/resolve",
     "/api/x402/v1/market-carry/{symbol}",
+    "/api/x402/v1/research/premarket",
+    "/api/x402/v1/screenshots/liquidation-levels/{symbol}",
+    "/api/x402/v1/screenshots/liquidation-bucket/{symbol}",
+    "/api/x402/v1/screenshots/trader-profile/{address}",
   ]) assert.ok(x402.includes(`  ${path}:`), `x402 contract missing: ${path}`);
 });
 
@@ -113,7 +123,7 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string)
   });
 }
 
-test("all nine paid x402 routes publish a payment challenge", async () => {
+test("all thirteen paid x402 routes publish an unpaid v2 payment challenge", async () => {
   const base = process.env.OMNI_APP_URL ?? "https://omniterminal.app";
   const address = "0x0ddf9bae2af4b874b96d287a5ad42eb47138a902";
   const targets: Array<[string, RequestInit?]> = [
@@ -126,10 +136,22 @@ test("all nine paid x402 routes publish a payment challenge", async () => {
     ["/api/x402/v1/market-snapshot/BTC?limit=20"],
     ["/api/x402/v1/symbols/resolve", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ mentions: ["bitcoin"] }) }],
     ["/api/x402/v1/market-carry/BTC"],
+    ["/api/x402/v1/research/premarket"],
+    ["/api/x402/v1/screenshots/liquidation-levels/BTC"],
+    ["/api/x402/v1/screenshots/liquidation-bucket/BTC?price=78800&side=all&scope=aggregate"],
+    [`/api/x402/v1/screenshots/trader-profile/${address}`],
   ];
   for (const [path, init] of targets) {
     const response = await fetch(new URL(path, base), init);
     assert.equal(response.status, 402, path);
     assert.ok(response.headers.has("payment-required"), `${path} omitted PAYMENT-REQUIRED`);
+    const challenge = JSON.parse(Buffer.from(response.headers.get("payment-required")!, "base64").toString());
+    assert.equal(challenge.x402Version, 2, path);
+    assert.ok(Array.isArray(challenge.accepts) && challenge.accepts.length > 0, path);
+    for (const terms of challenge.accepts) {
+      assert.equal(terms.scheme, "exact", path);
+      assert.ok(["eip155:84532", "eip155:8453"].includes(terms.network), path);
+      assert.match(terms.amount, /^[1-9]\d*$/, path);
+    }
   }
 });

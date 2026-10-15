@@ -13,12 +13,17 @@ console.log("Hyperliquid candles", (await hyperliquid.candles("BTC", "1h")).slic
 
 if (!publicOnly && process.env.OMNI_API_KEY) {
   console.log("paid news", await client.newsForSymbol("BTC", { limit: 5, lookback_days: 1 }));
-  console.log("Ask Omni", await client.askOmni({
-    question: "Summarize current BTC market risk using public market context.",
-    selectedSymbol: "BTC",
-  }));
+  if (process.env.RUN_ASK_OMNI === "true") {
+    console.log("Ask Omni", await client.askOmni({
+      presetId: "risk_overview",
+      question: "Summarize current BTC market risk using public market context.",
+      selectedSymbol: "BTC",
+    }));
+  } else {
+    console.log("Ask Omni skipped: set RUN_ASK_OMNI=true only with general API plan access; a News-only entitlement is not sufficient.");
+  }
 } else {
   console.log(publicOnly
     ? "Public-only mode: keyed AI News and Ask Omni calls were disabled."
-    : "Set OMNI_API_KEY to run keyed AI News and Ask Omni examples.");
+    : "Set OMNI_API_KEY for keyed AI News. Ask Omni additionally needs RUN_ASK_OMNI=true and general API plan access.");
 }

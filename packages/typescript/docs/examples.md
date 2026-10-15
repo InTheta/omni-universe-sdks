@@ -54,7 +54,7 @@ The `:public` and `:free` commands override payment and API-key flags from `.env
 | `npm run example:x402` | Yes | Buyer key only when paid mode is enabled | Only with `RUN_PAID_EXAMPLES=true` | No | No | Free health or all ten paid JSON products, then exits |
 | `npm run example:mcp:free` | Yes | No | No | No | No | Free MCP catalog, then exits |
 | `npm run example:mcp` | Yes | Buyer key only when paid mode is enabled | Only with `RUN_PAID_EXAMPLES=true` | No | No | Free catalog or five paid tools, then exits |
-| `npm run example:ask-omni:demo` | No | No | No | No | No | Prints the 0.016-0.040 USDC bundle plan and deterministic evidence |
+| `npm run example:ask-omni:demo` | No | No | No | No | No | Prints the current 0.120-0.144 USDC bundle plan and deterministic evidence; paid mode exceeds the unchanged example ceiling |
 | `npm run example:ask-omni` | Yes | Dedicated buyer key | Only with `RUN_PAID_ASK_OMNI_BUNDLE=yes` | No | No | Executes one bounded brief/deep/visual research bundle |
 | `npm run example:coinbase:demo` | No | No | No | Mocked preview | No | Deterministic BUY and preview, then exits |
 | `npm run example:coinbase` | Yes | Buyer wallet and Coinbase key | One call, or two with `both` | Authenticated preview | Only with both live gates | One decision, then exits |
@@ -70,7 +70,7 @@ npm run example:rest
 npm run example:news-ws
 ```
 
-`example:rest` always reads Hyperliquid instruments and candles directly from Hyperliquid. It adds Omni AI News and Ask Omni only when the API key is present. `example:news-ws` exchanges the key for a short-lived ticket, reads five news frames, closes the stream, and exits.
+`example:rest` always reads Hyperliquid instruments and candles directly from Hyperliquid. It adds Omni AI News when the API key is present. Ask Omni is separate: enable `RUN_ASK_OMNI=true` only with general API-plan access; a News-only entitlement is not sufficient. The example supplies the server-required `presetId`. `example:news-ws` exchanges the key for a short-lived ticket, reads five news frames, closes the stream, and exits.
 
 ## Paid x402 REST and MCP
 

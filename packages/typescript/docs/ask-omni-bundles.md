@@ -8,9 +8,9 @@ This follows the bundle pattern used by Agentic Market: quote a bounded run cost
 
 | Bundle | Evidence | Cost with a canonical symbol | Cost with entity resolution |
 | --- | --- | ---: | ---: |
-| Ask Omni Market Brief | Published roundup + live moving events + Market Risk | 0.016 USDC | 0.017 USDC |
-| Ask Omni Deep Market Research | Brief + Carry + Market Snapshot + full Liquidation Map | 0.029 USDC | 0.030 USDC |
-| Ask Omni Visual Risk Pack | Deep + liquidation-level PNG | 0.039 USDC | 0.040 USDC |
+| Ask Omni Market Brief | Published roundup + live moving events + Market Risk | 0.120 USDC | 0.121 USDC |
+| Ask Omni Deep Market Research | Brief + Carry + Market Snapshot + full Liquidation Map | 0.133 USDC | 0.134 USDC |
+| Ask Omni Visual Risk Pack | Deep + liquidation-level PNG | 0.143 USDC | 0.144 USDC |
 
 The prices above are the current maximum list-price sum. The unpaid challenge is the authority for current terms. Do not sign if a route, asset, network, recipient, or amount differs from policy.
 
@@ -19,8 +19,8 @@ The prices above are the current maximum list-price sum. The unpaid challenge is
 | Service | Transport | Price | Role |
 | --- | --- | ---: | --- |
 | `resolve_market_entities` | Omni MCP + x402 | 0.001 | Optional normalization of names such as `bitcoin` or `BTC-PERP` |
-| `get_premarket_roundup` | Omni MCP + x402 | 0.005 | Latest (default) or exact-date published morning thesis, sanitized excerpt, and canonical article URL |
-| `get_market_moving_events` | Omni MCP + x402 | 0.001 | Fresh catalysts, sentiment, impact, confidence, and affected tickers |
+| `get_premarket_roundup` | Omni MCP + x402 | 0.100 | Latest (default) or exact-date published morning thesis, sanitized excerpt, and canonical article URL |
+| `get_market_moving_events` | Omni MCP + x402 | 0.010 | Fresh catalysts, sentiment, impact, confidence, and affected tickers |
 | `get_market_risk_context` | Omni MCP + x402 | 0.010 | Required mark-anchored liquidation pressure, margin stress, carry, and news gate |
 | `get_market_carry` | Omni MCP + x402 | 0.003 | Dedicated 1h funding and mechanical 8h, 1d, and APR cross-check |
 | `/market-snapshot/{symbol}` | HTTP + x402 | 0.005 | Price structure, OHLCV, funding, and liquidation overlay |
@@ -53,20 +53,18 @@ npm run example:ask-omni:demo
 
 The demo uses deterministic placeholders, performs no external request, and makes no payment.
 
-For a tiny funded Base Sepolia run, use a dedicated low-balance buyer wallet:
+The committed bundle example is currently qualified for the no-spend demo path
+only. Its existing maximum aggregate ceiling is 0.050 USDC and its per-call cap
+is 0.010 USDC. Every complete bundle now exceeds that ceiling, and the roundup
+alone exceeds the per-call cap. Paid mode therefore rejects the corrected plan
+before making a paid request. Do not follow old 0.030-USDC funded-run instructions
+or raise caps merely to make a demo pass.
 
-```bash
-OMNI_X402_NETWORK=eip155:84532 \
-OMNI_ASK_OMNI_TIER=deep \
-OMNI_SYMBOL=BTC \
-OMNI_MARKET_MENTION=bitcoin \
-X402_BUNDLE_MAX_USD=0.030 \
-RUN_PAID_ASK_OMNI_BUNDLE=yes \
-EVM_PRIVATE_KEY=0x... \
-npm run example:ask-omni
-```
-
-The example checks the full bundle ceiling before the first paid call and enforces 0.010 USDC per call. It returns `ask_omni_bundle.v1` evidence and settlement objects; it does not call a broker.
+To integrate a real bundle, first inspect the free catalog, select the exact
+products, and obtain an explicit aggregate and per-call budget. Use the single
+Market Risk example in the README for a smaller deliberately approved request.
+Any separately approved bundle implementation must retain receipt validation,
+no-retry reconciliation and broker separation. This example never calls a broker.
 
 Base mainnet is available only when `OMNI_X402_NETWORK=eip155:8453` is set explicitly and the dedicated wallet is funded. Start on Sepolia. Never use a broker, treasury, receiver, or general-purpose wallet as the payer.
 
@@ -75,7 +73,7 @@ Base mainnet is available only when `OMNI_X402_NETWORK=eip155:8453` is set expli
 ```text
 Name: Ask Omni Deep Market Research
 Tagline: Published morning thesis plus live catalysts, carry, liquidations, and market structure
-Cost per run: 0.029-0.030 USDC
+Cost per run: 0.133-0.134 USDC (current list prices; inspect live terms)
 Success model: required core evidence; optional enrichments are omitted without automatic retry
 
 You are a market-risk analyst. For the user's market question:
