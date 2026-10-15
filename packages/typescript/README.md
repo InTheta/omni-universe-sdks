@@ -279,3 +279,7 @@ npm audit --omit=dev
 ## Verified research and recovery agents
 
 See [research and payment recovery](docs/research-and-payment-recovery.md) for an unsigned live research workflow, explicit testnet paid prerequisites, aggregate/recipient bounds, cancellation, and deterministic recovery evidence. These additions target unreleased 0.8.1 source until the coordinated release.
+
+## Error-handling migration in the source-only v0.8.1 update
+
+HTTP and contract errors no longer expose raw seller response bodies or seller-supplied error text through `message` or `details`. These responses can contain untrusted content, credentials, or reusable payment proofs. Handle the SDK's allowlisted `.code`, HTTP `.status`, and sanitized `.requestId` / `.retryAfter` fields instead of parsing upstream prose or logging response payloads. Unknown seller error codes are omitted. This migration applies when upgrading to this source build; it is not a claim about the currently published v0.8.0 package.
