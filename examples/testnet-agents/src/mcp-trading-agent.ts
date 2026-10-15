@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { assertTradingTools } from "./mcp-discovery.js";
 import { reconciliationResult } from "./mcp-result.js";
 import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -28,7 +29,7 @@ const call = async (name: string, args: Record<string, unknown> = {}) => {
 try {
   await client.connect(transport, { timeout: 15_000 });
   const tools = await client.listTools({}, { timeout: 15_000 });
-  assert.deepEqual(tools.tools.map(t => t.name).sort(), ["account", "cancel_order", "market", "order_status", "preview_order", "preview_reduction", "reconcile", "submit_order"].sort());
+  assertTradingTools(tools.tools);
   evidence.tools = tools.tools.map(t => t.name);
   if (recover && recoverPlanId) {
     attempted.push(recoverPlanId);

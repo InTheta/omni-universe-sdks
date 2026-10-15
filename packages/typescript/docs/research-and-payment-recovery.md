@@ -1,10 +1,10 @@
 # Research and payment recovery agents
 
-These examples target the working tree SDK (0.8.1 source). The new APIs below are not claimed available in the existing 0.8.0 release. Build/install the reviewed packed artifact or await the coordinated SDK release.
+These examples target the coordinated v0.8.1 SDK release. Install its tagged archive once published or build the matching source as described in the [release notes](releases/0.8.1.md). Historical v0.8.0 does not contain these new APIs.
 
 ## Free real research agent
 
-Prerequisites: Node >=20.19, install dependencies with `npm ci` in `packages/typescript`, then `npm run build`. From that directory:
+Prerequisites: Node >=22.12, install dependencies with `npm ci` in `packages/typescript`, then `npm run build`. From that directory:
 
 ```sh
 RESEARCH_SYMBOL=BTC node --import tsx examples/agents/research-readonly.ts

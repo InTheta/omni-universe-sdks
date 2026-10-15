@@ -19,21 +19,18 @@ Private deployment addresses are deliberately not embedded. Override the public 
 
 ## Install
 
-The public source release is available in this repository. npm registry publication is a separate release step and is not complete yet. Until then, install the verified GitHub release tarball or develop from `packages/typescript`.
+Use the coordinated v0.8.1 GitHub release archive once its tagged asset is published. If the archive is not available yet, use the source build below. npm registry publication is a separate release step. Read the [v0.8.1 release and migration notes](docs/releases/0.8.1.md) before upgrading.
 
 ```bash
-npm install https://github.com/InTheta/omni-universe-sdks/releases/download/v0.8.0/omni-terminal-sdk-0.8.0.tgz
+npm install https://github.com/InTheta/omni-universe-sdks/releases/download/v0.8.1/omni-terminal-sdk-0.8.1.tgz
 ```
 
-These are public contract versions checked on 15 October 2026, not SDK package
-versions. The latest GitHub artifact remains v0.8.0; repository main is v0.8.1
-source. The live schema and unpaid payment challenge take precedence over a
-version or price recorded in this guide.
+These public contract versions were checked on 15 October 2026 and are separate from SDK package v0.8.1. The live schema and unpaid payment challenge take precedence over a version or price recorded in this guide.
 
 The v0.8.0 artifact contains nine JSON product helpers and does not include
 `premarketRoundup()`, `premarketRoundupData()`, the forced-free `:free` scripts,
 or newer verification/demo commands. The thirteen-product HTTP examples below describe
-current source, including the three new PNG helpers. Installing the tarball into a consumer project does not install
+v0.8.1, including the three PNG helpers. Installing the tarball into a consumer project does not install
 repository test commands; use the source checkout for those.
 
 For source development, start at a fresh checkout (Node.js 22.12+):
@@ -276,7 +273,7 @@ npm run test:live
 npm audit --omit=dev
 ```
 
-`npm run verify:live` uses the forced `example:rest:public`, `example:x402:free`, and `example:mcp:free` variants. They ignore keyed/payment flags from `.env`, spend nothing, and submit no order. The live tests verify Omni health, direct Hyperliquid instruments/candles/WebSocket data, the published REST/x402 route boundary, every MCP tool, and valid unpaid challenges from all ten JSON x402 routes.
+`npm run verify:live` uses the forced `example:rest:public`, `example:x402:free`, and `example:mcp:free` variants. They ignore keyed/payment flags from `.env`, spend nothing, and submit no order. The live tests verify Omni health, direct Hyperliquid instruments/candles/WebSocket data, the published REST/x402 route boundary, every MCP tool, and valid unpaid challenges from all thirteen x402 routes (ten JSON and three PNG products).
 
 `npm run verify` additionally creates the real npm tarball, checks its allowlisted contents, installs it into a clean temporary consumer project, and imports the public root and broker subpath exports. This is stronger than a packaging dry run and detects version/export drift from the artifact consumers actually receive.
 
@@ -294,11 +291,11 @@ npm audit --omit=dev
 
 ## Verified research and recovery agents
 
-See [research and payment recovery](docs/research-and-payment-recovery.md) for an unsigned live research workflow, explicit testnet paid prerequisites, aggregate/recipient bounds, cancellation, and deterministic recovery evidence. These additions target unreleased 0.8.1 source until the coordinated release.
+See [research and payment recovery](docs/research-and-payment-recovery.md) for an unsigned live research workflow, explicit testnet paid prerequisites, aggregate/recipient bounds, cancellation, and deterministic recovery evidence. These APIs are included in the coordinated v0.8.1 release.
 
-## Error-handling migration in the source-only v0.8.1 update
+## Error-handling migration in v0.8.1
 
-HTTP and contract errors no longer expose raw seller response bodies or seller-supplied error text through `message` or `details`. These responses can contain untrusted content, credentials, or reusable payment proofs. Handle the SDK's allowlisted `.code`, HTTP `.status`, and sanitized `.requestId` / `.retryAfter` fields instead of parsing upstream prose or logging response payloads. Unknown seller error codes are omitted. This migration applies when upgrading to this source build; it is not a claim about the currently published v0.8.0 package.
+HTTP and contract errors no longer expose raw seller response bodies or seller-supplied error text through `message` or `details`. These responses can contain untrusted content, credentials, or reusable payment proofs. Handle the SDK's allowlisted `.code`, HTTP `.status`, and sanitized `.requestId` / `.retryAfter` fields instead of parsing upstream prose or logging response payloads. Unknown seller error codes are omitted. This migration applies when upgrading to v0.8.1; historical v0.8.0 consumers retain their prior behavior.
 ### MCP protocol errors
 
 `OmniMcpClient` wraps connection, tool-listing, tool-call and close failures in
@@ -310,4 +307,4 @@ payment before approving another attempt. This guarantee applies to Omni's
 wrapper; direct use of the raw `@modelcontextprotocol/sdk` client requires its
 own error redaction and must not log arbitrary exception data.
 
-Source-only recent testnet accounting: [bounded fill, fee and funding report](docs/recent-reconciliation.md), with explicit retention gaps and no signing or paid usage.
+Recent testnet accounting in v0.8.1: [bounded fill, fee and funding report](docs/recent-reconciliation.md), with explicit retention gaps and no signing or paid usage.

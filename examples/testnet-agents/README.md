@@ -1,8 +1,8 @@
-> Source migration: execution now delegates to the public `GuardedTestnetExecutor` from the sibling SDK source, rather than the old v0.8.0 tarball. Build `packages/typescript` first, then install this example. Exact owner account, a fresh private `TESTNET_JOURNAL_DIRECTORY`, 200 bp offset, flat instrument position and pre-existing Omni builder approval of 25 tenths bp (2.5 bp) are required. Keys stay local. The new guarded guide is `../../packages/typescript/docs/guarded-testnet.md`. No older release is claimed to export this API.
+> v0.8.1 migration: execution delegates to the public `GuardedTestnetExecutor`. This repository example uses the matching sibling SDK through a local package dependency: build `packages/typescript` before `npm ci` here. Historical v0.8.0 does not export this API. Exact owner account, a fresh private `TESTNET_JOURNAL_DIRECTORY`, 200 bp offset, flat instrument position and pre-existing Omni builder approval of 25 tenths bp (2.5 bp) are required. Keys stay local. See the [guarded guide](../../packages/typescript/docs/guarded-testnet.md) and [release notes](../../packages/typescript/docs/releases/0.8.1.md).
 
 # Omni Hyperliquid testnet agents
 
-Runnable Node.js 22 examples for guarded agent decisions and Hyperliquid testnet execution. The package has no configurable Hyperliquid API URL: every market-data, signing, order, and cancel request is pinned to `https://api.hyperliquid-testnet.xyz` and fails closed if that boundary changes.
+Runnable Node.js >=22.12 examples for guarded agent decisions and Hyperliquid testnet execution. The package has no configurable Hyperliquid API URL: every market-data, signing, order, and cancel request is pinned to `https://api.hyperliquid-testnet.xyz` and fails closed if that boundary changes.
 
 The examples use the community TypeScript client linked by Hyperliquid's official API documentation. Testnet asset IDs are resolved from live testnet metadata rather than copied from mainnet.
 

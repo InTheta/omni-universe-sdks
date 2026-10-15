@@ -1,4 +1,6 @@
 import test from "node:test";
+import type { GuardedTestnetExecutor } from "@omni-terminal/sdk";
+import { assertTradingTools } from "../src/mcp-discovery.js";
 import { reconciliationResult } from "../src/mcp-result.js";
 import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, statSync } from "node:fs";
@@ -8,12 +10,30 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createGuardedTradingMcpServer, type TradingExecutor } from "../src/mcp-trading.js";
 
-async function session(path: string, uncertain = false, hold?: Promise<void>, recent?: TradingExecutor["recentReconciliation"]) {
+type AccountMargin = Awaited<ReturnType<GuardedTestnetExecutor["account"]>>["margin"];
+const accountFixture = () => {
+ const margin: AccountMargin = {currency: "USD", instrument: "EXACT", mode: "cross", leverage: 4,
+    initialMarginUsd: "25", crossInitialMarginUsd: "25", crossMaintenanceMarginUsd: "5",
+    instrumentInitialMarginUsd: "25", instrumentMaintenanceMarginUsd: null,
+    maintenanceMarginScope: "cross_account_only", availableCollateralUsd: "100"};
+ return ({
+  network: "hyperliquid-testnet" as const, accountAddress: "0x" + "1".repeat(40),
+  state: { withdrawable: "100", time: 1000,
+    marginSummary: {accountValue: "125", totalMarginUsed: "25", totalNtlPos: "100", totalRawUsd: "125"},
+    crossMarginSummary: {accountValue: "125", totalMarginUsed: "25", totalNtlPos: "100", totalRawUsd: "125"},
+    crossMaintenanceMarginUsed: "5", assetPositions: [{type: "oneWay", position: {coin: "EXACT", szi: "1", marginUsed: "25", positionValue: "100", entryPx: "100", unrealizedPnl: "0", leverage: {type: "cross", value: 4}}}],
+  },
+  margin,
+  approvedBuilderFee: 10,
+});
+};
+
+async function session(path: string, uncertain = false, hold?: Promise<void>, recent?: TradingExecutor["recentReconciliation"], account = accountFixture()) {
   let submits = 0;
   const server = createGuardedTradingMcpServer(persist => ({
     ...(recent ? { recentReconciliation: recent } : {}),
     async market() { return { symbol: "EXACT", network: "hyperliquid-testnet" }; },
-    async account() { return { accountAddress: "fixed_test_account", withdrawable: "100" }; },
+    async account() { return account; },
     async preview(side, notionalUsd) { return { side, notionalUsd, cloid: "0x" + Date.now().toString(16).padStart(32, "0"), network: "hyperliquid-testnet", accountAddress: "0x" + "1".repeat(40), symbol: "EXACT", asset: 0, price: "100", size: "0.15", createdAt: Date.now(), expiresAt: Date.now() + 15000, tif: "Alo", reduceOnly: false, builder: { b: "0x" + "2".repeat(40), f: 10 } }; },
     async submit(plan: unknown) { submits++; const journal = { plan, stage: "submitting", startedAt: Date.now() }; await persist(journal); await hold; if (uncertain) throw new Error("lost_response"); return journal; },
     async status() { return { status: "open" }; },
@@ -35,6 +55,8 @@ test("actual MCP discovery validates schema and fixes policy scope outside tool 
   try {
     const tools = (await s.client.listTools()).tools;
     assert.equal(tools.length, 8);
+    assertTradingTools(tools);
+    assert.throws(() => assertTradingTools(tools.filter(tool => tool.name !== "submit_order")), /omitted required trading tool: submit_order/);
     for (const tool of tools) assert(!JSON.stringify(tool.inputSchema).match(/privateKey|accountAddress|network|builder/));
     const invalid = await s.call("preview_order", { side: "UNKNOWN", notionalUsd: 15 });
     assert.equal(invalid.isError, true);
@@ -42,6 +64,35 @@ test("actual MCP discovery validates schema and fixes policy scope outside tool 
     assert.equal(over.isError, true);
     assert.equal(s.submits(), 0);
   } finally { await s.client.close(); await s.server.close(); }
+});
+
+test("actual MCP account output preserves SDK margin scope, values and unavailable fields", async () => {
+  for (const noPosition of [false, true]) {
+    const account = accountFixture();
+    if (noPosition) {
+      account.state.assetPositions = [];
+      account.state.withdrawable = "125";
+      account.state.marginSummary = {...account.state.marginSummary, totalMarginUsed: "0", totalNtlPos: "0"};
+      account.state.crossMarginSummary = {...account.state.crossMarginSummary, totalMarginUsed: "0", totalNtlPos: "0"};
+      account.state.crossMaintenanceMarginUsed = "0";
+      account.margin = {...account.margin, mode: "no_position", leverage: null,
+        initialMarginUsd: "0", crossInitialMarginUsd: "0", crossMaintenanceMarginUsd: "0",
+        instrumentInitialMarginUsd: null, availableCollateralUsd: "125"};
+    }
+    const s = await session(path(), false, undefined, undefined, account);
+    try {
+      const response = await s.call("account");
+      assert.equal(response.isError, undefined);
+      const actual = data(response);
+      assert.deepEqual(actual, account);
+      assert.deepEqual(actual.margin, account.margin);
+      assert.equal((actual.margin as typeof account.margin).instrumentMaintenanceMarginUsd, null);
+      assert.equal((actual.margin as typeof account.margin).maintenanceMarginScope, "cross_account_only");
+      const tool = (await s.client.listTools()).tools.find(tool => tool.name === "account")!;
+      assert.ok(JSON.stringify(tool.outputSchema).includes("instrumentMaintenanceMarginUsd"));
+      assert.equal(s.submits(), 0);
+    } finally { await s.client.close(); await s.server.close(); }
+  }
 });
 
 test("one-use plan, durable private journal, known-scope status/cancel/reconcile", async () => {
@@ -126,7 +177,10 @@ test("read-only reconciliation tool keeps account policy outside inputs and retu
       limits: { conservativePageThreshold: 500, fillRetention: "latest_10000_fills", builderCredit: "unverified", fundingAttribution: "account_instrument_period_not_order" } };
   });
   try {
-    const tool = (await s.client.listTools()).tools.find(tool => tool.name === "recent_reconciliation")!;
+    const tools = (await s.client.listTools()).tools;
+    assert.equal(tools.length, 9);
+    assertTradingTools(tools);
+    const tool = tools.find(tool => tool.name === "recent_reconciliation")!;
     assert.equal(tool.annotations?.readOnlyHint, true);
     assert(!JSON.stringify(tool.inputSchema).match(/accountAddress|network|builder|privateKey/));
     const invalid = await s.call("recent_reconciliation", { startTime: 0, endTime: 100, maxRequests: 17 });

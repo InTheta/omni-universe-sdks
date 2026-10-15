@@ -11,7 +11,7 @@ npm ci
 npm run verify
 ```
 
-Node.js 20.19 or newer is required. Every `npm run example:*` command loads `.env` when present; values already injected into the process environment take precedence.
+Node.js 22.12 or newer is required for v0.8.1. Every `npm run example:*` command loads `.env` when present; values already injected into the process environment take precedence.
 
 ## Start with the no-spend demos
 
