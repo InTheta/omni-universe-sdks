@@ -33,6 +33,18 @@ const planSchema = z.object({
   builder: z.object({ b: address, f: z.number().int().min(1).max(25).describe("Tenths of a basis point; 10 = 1 bp") }),
 }).passthrough();
 const marginSchema = z.object({ accountValue: decimal, totalMarginUsed: decimal, totalNtlPos: decimal, totalRawUsd: decimal }).passthrough();
+const accountMarginSchema = z.object({
+  currency: z.literal("USD"), instrument: z.string(),
+  mode: z.enum(["cross", "isolated", "unknown", "no_position"]),
+  leverage: z.number().finite().nullable().describe("Position leverage multiplier, when available"),
+  initialMarginUsd: decimal.nullable().describe("Account initial margin in USD"),
+  crossInitialMarginUsd: decimal.nullable(),
+  crossMaintenanceMarginUsd: decimal.nullable().describe("Cross-account maintenance margin only"),
+  instrumentInitialMarginUsd: decimal.nullable(),
+  instrumentMaintenanceMarginUsd: z.null().describe("Unavailable; never inferred from initial margin"),
+  maintenanceMarginScope: z.literal("cross_account_only"),
+  availableCollateralUsd: decimal.nullable(),
+});
 const positionSchema = z.object({ position: z.object({ coin: z.string(), szi: decimal, marginUsed: decimal, positionValue: decimal, entryPx: decimal.nullable(), unrealizedPnl: decimal, leverage: z.object({ type: z.enum(["isolated", "cross"]), value: z.number() }).passthrough() }).passthrough() }).passthrough();
 const journalSchema = z.object({ plan: planSchema, stage: z.enum(["prepared", "submitting", "submitted", "uncertain", "cancel_requested", "reconciled", "rejected"]), startedAt: z.number().int(), orderId: z.number().int().optional() }).passthrough();
 const statusSchema = z.object({ status: z.string(), order: z.object({ status: z.string(), order: z.object({ coin: z.string(), oid: z.number().int(), cloid: z.string().nullable().optional() }).passthrough() }).passthrough().optional() }).passthrough();
@@ -126,7 +138,7 @@ export function createGuardedTradingMcpServer(createExecutor: (persist: (journal
     }, (options, extra) => guarded(() => recent({ ...options, signal: extra.signal })));
   }
   server.registerTool("market", { description: "Resolve the exact startup-bound Hyperliquid TESTNET market; no fallback symbol.", inputSchema: {}, outputSchema: output(z.object({ asset: z.number().int(), symbol: z.string(), szDecimals: z.number().int(), midPrice: z.number().positive().describe("Quote USD per base unit"), bookTime: z.number().int().describe("Unix milliseconds") })) }, () => guarded(() => executor.market()));
-  server.registerTool("account", { description: "Read the exact policy-bound TESTNET account collateral, positions and permissions.", inputSchema: {}, outputSchema: output(z.object({ network: z.literal("hyperliquid-testnet"), accountAddress: address, state: z.object({ withdrawable: decimal.describe("Withdrawable testnet USD collateral"), marginSummary: marginSchema, crossMarginSummary: marginSchema, crossMaintenanceMarginUsed: decimal.optional(), assetPositions: z.array(positionSchema) }).passthrough(), approvedBuilderFee: z.number().nonnegative().describe("Approved tenths of a basis point") })) }, () => guarded(() => executor.account()));
+  server.registerTool("account", { description: "Read the exact policy-bound TESTNET account collateral, positions and permissions.", inputSchema: {}, outputSchema: output(z.object({ network: z.literal("hyperliquid-testnet"), accountAddress: address, state: z.object({ withdrawable: decimal.describe("Withdrawable testnet USD collateral"), marginSummary: marginSchema, crossMarginSummary: marginSchema, crossMaintenanceMarginUsed: decimal.optional(), assetPositions: z.array(positionSchema) }).passthrough(), margin: accountMarginSchema, approvedBuilderFee: z.number().nonnegative().describe("Approved tenths of a basis point") })) }, () => guarded(() => executor.account()));
   server.registerTool("preview_order", { description: "Prepare a bounded TESTNET order, without signing. Returns a server-generated one-use plan ID.", inputSchema: { side: z.enum(["BUY", "SELL"]), notionalUsd: z.number().finite().min(10).max(25), kind: z.enum(["passive", "ioc"]).default("passive") }, outputSchema: output(z.object({ planId: z.string().uuid(), plan: planSchema })) }, ({ side, notionalUsd, kind }) => guarded(async () => {
     if (ledger.entries.length >= 64) throw new Error("plan_limit_reached");
     const plan = await executor.preview(side, notionalUsd, kind === "ioc" ? { kind } : undefined);
