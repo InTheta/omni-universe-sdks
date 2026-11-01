@@ -1,3 +1,5 @@
+import type { PublicMarketAlerts, PublicMarketAlertsQuery } from "./types.js";
+import { validateMarketAlertsQuery, assertMarketAlertsIdentity } from "./x402.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { x402Client } from "@x402/core/client";
@@ -19,7 +21,7 @@ export type OmniMcpToolName =
   | PublicJsonMcpToolName
   | ScreenshotMcpToolName;
 export type SpotMcpToolName="get_spot_market_quote"|"get_spot_candles"|"list_spot_market_instruments";
-export type PublicJsonMcpToolName="get_trader_leaderboard"|"get_trader_profile"|"get_liquidation_map"|"get_market_snapshot"|"get_market_microstructure"|"get_funding_history"|"get_l4_orderbook"|"get_realized_liquidations";
+export type PublicJsonMcpToolName="get_market_alerts"|"get_trader_leaderboard"|"get_trader_profile"|"get_liquidation_map"|"get_market_snapshot"|"get_market_microstructure"|"get_funding_history"|"get_l4_orderbook"|"get_realized_liquidations";
 export type ScreenshotMcpToolName="get_liquidation_levels_screenshot"|"get_liquidation_bucket_screenshot"|"get_trader_profile_screenshot";
 export type PublicMcpToolName=OmniMcpToolName|PublicJsonMcpToolName|ScreenshotMcpToolName;
 
@@ -147,6 +149,7 @@ export class OmniMcpClient {
   catalogData(): Promise<OmniMcpDataResult<OmniMcpMarketCatalog>> {
     return this.callJsonTool("get_market_catalog");
   }
+  async marketAlertsData(symbol:string,query:PublicMarketAlertsQuery={}):Promise<OmniMcpDataResult<PublicMarketAlerts>>{const result=await this.callJsonTool<PublicMarketAlerts>("get_market_alerts",{...query,symbol});assertMarketAlertsIdentity(result.data,symbol);return result;}
   marketInstrumentsData(query:PublicMarketsQuery={}):Promise<OmniMcpDataResult<PublicMarketCatalog>>{return this.callJsonTool("list_market_instruments",{...query});}
   spotMarketInstrumentsData(query:PublicSpotMarketsQuery={}):Promise<OmniMcpDataResult<PublicSpotMarketCatalog>>{return this.callJsonTool("list_spot_market_instruments",{...query});}
   async spotMarketQuoteData(pairIndex:number,query:{depth?:number}={}):Promise<OmniMcpDataResult<SpotMarketQuote>>{const result=await this.callJsonTool<SpotMarketQuote>("get_spot_market_quote",{...query,pair_index:pairIndex});assertSpotResultIdentity(result.data,pairIndex);return result;}
@@ -209,6 +212,7 @@ export class OmniMcpClient {
 }
 
 const mcpToolContracts: Record<OmniMcpToolName, { service: string; schema?: string; requiredCollection?: string }> = {
+  get_market_alerts:{service:"omni.public_market_alerts",schema:"public_market_alerts.v1",requiredCollection:"events"},
   list_spot_market_instruments:{service:"omni.public_spot_market_catalog",schema:"public_spot_market_catalog.v1",requiredCollection:"rows"},
   get_spot_market_quote:{service:"omni.hyperliquid_spot_quote",schema:"hyperliquid_spot_quote.v1"},
   get_spot_candles:{service:"omni.hyperliquid_spot_candles",schema:"hyperliquid_spot_candles.v1",requiredCollection:"candles"},
@@ -316,6 +320,11 @@ export function validateMcpToolArguments(
   const input = assertArgumentObject(args);
 
   switch (name) {
+    case "get_market_alerts": {
+      assertOnlyKeys(name,input,["symbol","limit","lookback_hours","before_timestamp","types"]);
+      const {symbol,...query}=input;assertPublicMarketSymbol(symbol);validateMarketAlertsQuery(query as PublicMarketAlertsQuery);return{...query,symbol};
+    }
+
     case "get_market_catalog":
       assertOnlyKeys(name, input, []);
       return {};
@@ -371,9 +380,9 @@ export function validateMcpToolArguments(
   }
 }
 
-function validatePublicMcpArguments(name:PublicJsonMcpToolName|ScreenshotMcpToolName,input:Record<string,unknown>){
+function validatePublicMcpArguments(name:Exclude<PublicJsonMcpToolName,"get_market_alerts">|ScreenshotMcpToolName,input:Record<string,unknown>){
   if(input.symbol!==undefined)input={...input,symbol:normalizeString("symbol",input.symbol,1,80)};
-  const fields:Record<PublicJsonMcpToolName|ScreenshotMcpToolName,string[]>={
+  const fields:Record<Exclude<PublicJsonMcpToolName,"get_market_alerts">|ScreenshotMcpToolName,string[]>={
     get_trader_leaderboard:["symbol","scope","rank","limit"],get_trader_profile:["address","range","view","symbol","limit"],get_liquidation_map:["symbol","scope","view","limit","order","around_price","side"],get_market_snapshot:["symbol","scope","interval","limit","include_liquidations"],get_market_microstructure:["symbol","depth","trade_limit","trade_window_seconds"],get_funding_history:["symbol","lookback_hours","limit"],get_l4_orderbook:["symbol","orders_per_side"],get_realized_liquidations:["symbol","scope","windows"],get_liquidation_levels_screenshot:["symbol","interval","scope","layout"],get_liquidation_bucket_screenshot:["symbol","price","price_end","bucket_size","side","scope"],get_trader_profile_screenshot:["address","symbol","range","tab","mode"],
   };
   assertOnlyKeys(name,input,fields[name]);

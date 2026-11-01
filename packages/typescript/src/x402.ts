@@ -1,3 +1,4 @@
+import type { PublicMarketAlerts, PublicMarketAlertsQuery } from "./types.js";
 import { decodePaymentRequiredHeader } from "@x402/core/http";
 import { x402Client, x402HTTPClient } from "@x402/core/client";
 import { ExactEvmScheme } from "@x402/evm/exact/client";
@@ -408,6 +409,12 @@ export class OmniX402Client {
     assertSpotResultIdentity(result.data,pairIndex);return result;
   }
 
+  async marketAlerts(symbol:PublicMarketSymbol,query:PublicMarketAlertsQuery={}):Promise<PaidResult<PublicMarketAlerts>>{
+    assertPublicMarketSymbol(symbol);validateMarketAlertsQuery(query);
+    const result=await this.request<PublicMarketAlerts>("GET",`/api/x402/v1/market-alerts/${encodeURIComponent(symbol)}`,{query:{...query,types:query.types?.join(",")},contract:{service:"omni.public_market_alerts",schema:"public_market_alerts.v1",requiredCollection:"events"}});
+    assertMarketAlertsIdentity(result.data,symbol);return result;
+  }
+
   fundingHistory(symbol:PublicMarketSymbol,query:{lookback_hours?:number;limit?:number}={}):Promise<PaidResult<FundingHistory>>{
     assertPublicMarketSymbol(symbol);assertOptionalInteger("lookback_hours",query.lookback_hours,1,168);assertOptionalInteger("limit",query.limit,1,168);
     return this.request("GET",`/api/x402/v1/funding-history/${encodeURIComponent(symbol)}`,{query,contract:{service:"omni.hyperliquid_funding_history",schema:"hyperliquid_funding_history.v1",requiredCollection:"rows"}});
@@ -677,4 +684,15 @@ async function waitForScreenshot<T>(promise: Promise<T>, signal: AbortSignal): P
   });
   try { return await Promise.race([promise, aborted]); }
   finally { signal.removeEventListener("abort", rejectOnAbort); }
+}
+
+export function validateMarketAlertsQuery(query:PublicMarketAlertsQuery):void {
+  for(const key of Object.keys(query))if(!["limit","lookback_hours","before_timestamp","types"].includes(key))throw new RangeError("unknown market alerts query");
+  assertOptionalInteger("limit",query.limit,1,20);assertOptionalInteger("lookback_hours",query.lookback_hours,1,24);
+  if(query.before_timestamp!==undefined&&(!Number.isSafeInteger(query.before_timestamp)||query.before_timestamp<1_000_000_000_000||query.before_timestamp>Date.now()))throw new RangeError("before_timestamp must be a past Unix millisecond timestamp");
+  if(query.types!==undefined&&(!Array.isArray(query.types)||query.types.length<1||query.types.length>2||new Set(query.types).size!==query.types.length||query.types.some(v=>!["large_liquidation","large_trader_action"].includes(v))))throw new RangeError("types must contain unique supported public market alert types");
+}
+export function assertMarketAlertsIdentity(data:PublicMarketAlerts,requested:string):void {
+  const parts=requested.split(":"),expected=parts.length===1?requested.toUpperCase():parts[0]!.toLowerCase()==="main"?parts[1]!.toUpperCase():`${parts[0]!.toLowerCase()}:${parts[1]!.toUpperCase()}`;
+  if(data.symbol!==expected||data.venue!=="hyperliquid"||data.market_type!=="perp"||data.events.some(e=>!e||typeof e!=="object"||e.symbol!==expected||typeof e.address!=="string"||!/^0x[0-9a-fA-F]{40}$/.test(e.address)||/^0x0{40}$/.test(e.address)||typeof e.id!=="string"||!/^market_event_[a-f0-9]{64}$/.test(e.id)||!["liquidation_fill","observed_position_change"].includes(e.kind)||!Number.isFinite(Date.parse(e.event_at))||Date.parse(e.event_at)>Date.now()+5000))throw unconfirmedPaidResponse(new OmniContractError("Paid market alerts response has an invalid market or wallet identity","market-alerts",undefined));
 }

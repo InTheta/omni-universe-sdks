@@ -74,3 +74,12 @@ broker use. Repository `npm run verify` applies the same explicit preparation an
 and opt-in packed consumers, including signed synthetic JWT verification and fail-closed unpatched
 peer behavior. Both audited configurations report zero findings at qualification. This qualifies
 dependency compatibility only; it does not establish live brokerage or custody acceptance.
+
+
+Market Alerts (successor DEV seller only)
+
+`marketAlerts(symbol, query)` and MCP `marketAlertsData(symbol, query)` purchase `public_market_alerts.v1` via `/api/x402/v1/market-alerts/:symbol` / `get_market_alerts`. These require a seller advertising `omni.public_market_alerts`; adding an SDK method does not establish current production availability.
+
+Limit is 1–20, lookback is 1–24 hours, and optional `before_timestamp` is a past Unix millisecond time. `types` accepts unique `large_liquidation` and `large_trader_action` values. Liquidations retain original native fill identity/time and full wallet addresses. Position changes are observed row changes with unconfirmed execution cause. Chat copies are deduplicated. Data is sampled from at most 500 curated source rows; complete-window coverage remains unknown. An empty result cannot prove a quiet market. Burst alerts are excluded until their original fills and duration can be established. Historical cursors are explicitly historical; request time never replaces event time.
+
+Liquidation `notional_usd` is nullable: without proven USDC quote identity it remains unavailable, while `notional_quote` and `quote_currency` describe the established quote basis. The test runner bounds concurrent files to two to avoid subprocess-startup timeouts on shared Dell runners; all assertions remain enabled.

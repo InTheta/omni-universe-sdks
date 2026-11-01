@@ -606,3 +606,18 @@ export interface AgentDecision {
   rationale: string[];
   maxNotionalUsd: number;
 }
+
+/** Curated, sampled public events; availability requires a qualified DEV/successor seller. */
+export type PublicMarketAlertType = "large_liquidation" | "large_trader_action";
+export interface PublicMarketAlertsQuery { limit?:number; lookback_hours?:number; before_timestamp?:number; types?:readonly PublicMarketAlertType[] }
+export type PublicMarketAlertEvent = {
+  id:string;address:string;symbol:string;event_at:string;freshness:Freshness;
+} & ({kind:"liquidation_fill";source_alert_type:"large_liquidation";source_timestamp_basis:"hyperliquid_native_fill_time";trade_id:string;execution_side:"buy"|"sell";liquidated_position_side:"long"|"short";price:number;base_size:number;notional_usd:number|null;quote_currency:string|null;notional_quote:number|null;notional_basis:"USDC_settled_protocol_price_times_size"|"quote_identity_not_proven_USDC"}
+ | {kind:"observed_position_change";source_alert_type:"large_trader_action";source_timestamp_basis:"observed_position_row_version";before_observed_at:string;before_base_size:number;after_base_size:number;change:"opening"|"closing"|"reversing"|"increasing"|"reducing";execution_cause:"unconfirmed"});
+export interface PublicMarketAlerts {
+  service:"omni.public_market_alerts";schema:"public_market_alerts.v1";product_version:"v1";symbol:string;canonical_symbol:string|null;venue:"hyperliquid";market_type:"perp";
+  generated_at:string;data_as_of:string|null;freshness:Freshness;events:PublicMarketAlertEvent[];
+  coverage:{sampled:true;complete_window:"unknown";quiet_window_proven:false;source_limit:500;market_filter_applied_after_source_limit:true;source_limit_reached:boolean;invalid_source_rows_excluded:boolean};
+  query:{limit:number;lookback_hours:number;before_timestamp:number|null;types:PublicMarketAlertType[]};
+  provenance:Record<string,unknown>;capabilities:Record<string,unknown>;
+}
