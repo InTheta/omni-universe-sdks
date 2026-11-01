@@ -621,3 +621,19 @@ export interface PublicMarketAlerts {
   query:{limit:number;lookback_hours:number;before_timestamp:number|null;types:PublicMarketAlertType[]};
   provenance:Record<string,unknown>;capabilities:Record<string,unknown>;
 }
+
+/** Historical House disclosures. Reported amounts are strings/ranges, not execution values. */
+export interface PublicCongressQuery { limit?:number; offset?:number; public_revision?:string }
+export interface PublicCongressRow {
+ id:string;row_index:number;asset:string;ticker:string|null;ticker_resolution:"reported_in_filing"|"unresolved";asset_type:string;
+ transaction_type:"buy"|"sell"|"exchange";reported_amount:string;amount_currency:"USD";amount_basis:"reported_disclosure_range_or_amount";
+ transaction_date:string;notification_date:string;owner_code:"SP"|"JT"|"DC"|null;sale_kind:"partial"|"total"|"full"|null;
+}
+export interface PublicCongressFiling {
+ service:"omni.public_congress_filing";schema:"public_congress_filing.v1";product_version:"v1";source:"house_clerk";chamber:"House";
+ doc_id:string;member:string;official_url:string;disclosure_date:string;parsed_at:string;public_revision:string;rows:PublicCongressRow[];
+ pagination:{limit:number;offset:number;source_row_count:number;returned_count:number;next_offset:number|null};
+ freshness:{status:"historical";data_as_of:string;source_poll_status:"unknown";timestamp_precision:"date"};
+ coverage:{parser_completed:true;document_rows_complete:"unknown";global_completeness:"unknown";amendment_status:"unknown";source_parsed_row_count:number};
+ capabilities:{chambers:readonly ["House"]|readonly string[];source:"house_clerk";lookup:"official_document_id";discovery:"not_available";coverage:"cached_parsed_documents_only";document_rows_complete:"unknown";global_completeness:"unknown";amendment_status:"unknown";amount_semantics:"reported_USD_range_or_amount_not_execution_value";senate:"unqualified"};
+}

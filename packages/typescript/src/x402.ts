@@ -1,3 +1,4 @@
+import type { PublicCongressFiling, PublicCongressQuery } from "./types.js";
 import type { PublicMarketAlerts, PublicMarketAlertsQuery } from "./types.js";
 import { decodePaymentRequiredHeader } from "@x402/core/http";
 import { x402Client, x402HTTPClient } from "@x402/core/client";
@@ -409,6 +410,12 @@ export class OmniX402Client {
     assertSpotResultIdentity(result.data,pairIndex);return result;
   }
 
+  async congressFiling(docId:string,query:PublicCongressQuery={}):Promise<PaidResult<PublicCongressFiling>> {
+    validateCongressRequest(docId,query);
+    const result=await this.request<PublicCongressFiling>("GET",`/api/x402/v1/congress-filings/${encodeURIComponent(docId)}`,{query:{...query},contract:{service:"omni.public_congress_filing",schema:"public_congress_filing.v1",requiredCollection:"rows"}});
+    assertCongressFilingIdentity(result.data,docId,query);return result;
+  }
+
   async marketAlerts(symbol:PublicMarketSymbol,query:PublicMarketAlertsQuery={}):Promise<PaidResult<PublicMarketAlerts>>{
     assertPublicMarketSymbol(symbol);validateMarketAlertsQuery(query);
     const result=await this.request<PublicMarketAlerts>("GET",`/api/x402/v1/market-alerts/${encodeURIComponent(symbol)}`,{query:{...query,types:query.types?.join(",")},contract:{service:"omni.public_market_alerts",schema:"public_market_alerts.v1",requiredCollection:"events"}});
@@ -695,4 +702,28 @@ export function validateMarketAlertsQuery(query:PublicMarketAlertsQuery):void {
 export function assertMarketAlertsIdentity(data:PublicMarketAlerts,requested:string):void {
   const parts=requested.split(":"),expected=parts.length===1?requested.toUpperCase():parts[0]!.toLowerCase()==="main"?parts[1]!.toUpperCase():`${parts[0]!.toLowerCase()}:${parts[1]!.toUpperCase()}`;
   if(data.symbol!==expected||data.venue!=="hyperliquid"||data.market_type!=="perp"||data.events.some(e=>!e||typeof e!=="object"||e.symbol!==expected||typeof e.address!=="string"||!/^0x[0-9a-fA-F]{40}$/.test(e.address)||/^0x0{40}$/.test(e.address)||typeof e.id!=="string"||!/^market_event_[a-f0-9]{64}$/.test(e.id)||!["liquidation_fill","observed_position_change"].includes(e.kind)||!Number.isFinite(Date.parse(e.event_at))||Date.parse(e.event_at)>Date.now()+5000))throw unconfirmedPaidResponse(new OmniContractError("Paid market alerts response has an invalid market or wallet identity","market-alerts",undefined));
+}
+
+export function validateCongressRequest(docId:string,query:PublicCongressQuery={}):void {
+ if(typeof docId!=="string"||!/^\d{1,12}$/.test(docId))throw new RangeError("docId must be a numeric official House document ID");
+ if(!query||typeof query!=="object"||Array.isArray(query))throw new TypeError("filing query must be an object");
+ for(const key of Object.keys(query))if(!["limit","offset","public_revision"].includes(key))throw new RangeError("unknown public filing query");
+ assertOptionalInteger("limit",query.limit,1,20);assertOptionalInteger("offset",query.offset,0,499);
+ if(query.public_revision!==undefined&&(typeof query.public_revision!=="string"||!/^[a-f0-9]{64}$/.test(query.public_revision)))throw new RangeError("invalid public filing revision");
+}
+export function assertCongressFilingIdentity(data:PublicCongressFiling,docId:string,query:PublicCongressQuery={}):void {
+ const reject=():never=>{throw unconfirmedPaidResponse(new OmniContractError("Paid House filing response has an invalid document or revision identity","congress-filings",undefined));};
+ const date=(v:unknown):v is string=>typeof v==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(v)&&Number.isFinite(Date.parse(`${v}T00:00:00Z`))&&new Date(`${v}T00:00:00Z`).toISOString().slice(0,10)===v;
+ const integer=(v:unknown,min:number,max:number):v is number=>typeof v==="number"&&Number.isSafeInteger(v)&&v>=min&&v<=max;
+ if(!data||typeof data!=="object"||data.service!=="omni.public_congress_filing"||data.schema!=="public_congress_filing.v1"||data.doc_id!==docId||data.source!=="house_clerk"||data.chamber!=="House"||typeof data.member!=="string"||!data.member.trim()||!date(data.disclosure_date)||typeof data.public_revision!=="string"||!/^[a-f0-9]{64}$/.test(data.public_revision)||(query.public_revision!==undefined&&data.public_revision!==query.public_revision)||!Array.isArray(data.rows))return reject();
+ if(typeof data.parsed_at!=="string"||!Number.isFinite(Date.parse(data.parsed_at))||Date.parse(data.parsed_at)<Date.parse(`${data.disclosure_date}T00:00:00Z`)||Date.parse(data.parsed_at)>Date.now()+5000)return reject();
+ if(data.official_url!==`https://disclosures-clerk.house.gov/public_disc/ptr-pdfs/${data.disclosure_date.slice(0,4)}/${docId}.pdf`||!data.freshness||data.freshness.status!=="historical"||data.freshness.data_as_of!==data.disclosure_date||data.freshness.timestamp_precision!=="date"||data.freshness.source_poll_status!=="unknown")return reject();
+ const page=data.pagination,coverage=data.coverage;
+ if(!page||page.limit!==(query.limit??20)||page.offset!==(query.offset??0)||!integer(page.source_row_count,1,500)||page.returned_count!==data.rows.length||data.rows.length>page.limit||!coverage||coverage.parser_completed!==true||coverage.document_rows_complete!=="unknown"||coverage.global_completeness!=="unknown"||coverage.amendment_status!=="unknown"||coverage.source_parsed_row_count!==page.source_row_count)return reject();
+ const count=Math.max(0,Math.min(page.limit,page.source_row_count-page.offset));if(count!==data.rows.length||page.next_offset!==(page.offset+count<page.source_row_count?page.offset+count:null))return reject();
+ const indices=new Set<number>(),ids=new Set<string>();let previousIndex=0;for(const row of data.rows){
+  if(!row||typeof row!=="object"||typeof row.id!=="string"||!/^house_filing_row_[a-f0-9]{64}$/.test(row.id)||!integer(row.row_index,1,10000)||indices.has(row.row_index)||row.row_index<=previousIndex||ids.has(row.id)||typeof row.asset!=="string"||!row.asset.trim()||row.asset.length>1000||/[\u0000-\u001f\u007f]/.test(row.asset)||typeof row.asset_type!=="string"||!/^[A-Z]{2}$/.test(row.asset_type)||!date(row.transaction_date)||!date(row.notification_date)||row.transaction_date>row.notification_date||row.notification_date>data.disclosure_date||!["buy","sell","exchange"].includes(row.transaction_type)||typeof row.reported_amount!=="string"||!/^\$\d[\d,]*(?:\.\d{2})?(?: - \$\d[\d,]*(?:\.\d{2})?)?$/.test(row.reported_amount)||row.amount_currency!=="USD"||row.amount_basis!=="reported_disclosure_range_or_amount")return reject();
+  if(![null,"SP","JT","DC"].includes(row.owner_code)||![null,"partial","total","full"].includes(row.sale_kind))return reject();
+  if(row.ticker===null?row.ticker_resolution!=="unresolved":typeof row.ticker!=="string"||!/^[A-Z][A-Z0-9.\-]{0,9}$/.test(row.ticker)||row.ticker_resolution!=="reported_in_filing")return reject();indices.add(row.row_index);ids.add(row.id);previousIndex=row.row_index;
+ }
 }

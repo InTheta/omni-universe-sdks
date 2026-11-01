@@ -1,3 +1,5 @@
+import type { PublicCongressFiling, PublicCongressQuery } from "./types.js";
+import {validateCongressRequest,assertCongressFilingIdentity} from "./x402.js";
 import type { PublicMarketAlerts, PublicMarketAlertsQuery } from "./types.js";
 import { validateMarketAlertsQuery, assertMarketAlertsIdentity } from "./x402.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -10,6 +12,7 @@ import { createEvmPaymentClient, DEFAULT_MAX_X402_PAYMENT_USD, validatePaymentSe
 import type { PublicMarketCatalog, PublicMarketsQuery, L4BookSnapshot, RealizedLiquidations, LiquidationWindow, PublicSpotMarketCatalog, PublicSpotMarketsQuery, SpotMarketQuote, SpotCandles, SpotCandleInterval } from "./types.js";
 
 export type OmniMcpToolName =
+  | "get_congress_filing"
   | "get_market_catalog"
   | "list_market_instruments"
   | SpotMcpToolName
@@ -149,6 +152,11 @@ export class OmniMcpClient {
   catalogData(): Promise<OmniMcpDataResult<OmniMcpMarketCatalog>> {
     return this.callJsonTool("get_market_catalog");
   }
+  async congressFilingData(docId:string,query:PublicCongressQuery={}):Promise<OmniMcpDataResult<PublicCongressFiling>> {
+    validateCongressRequest(docId,query);
+    try {const result=await this.callJsonTool<PublicCongressFiling>("get_congress_filing",{...query,doc_id:docId});assertCongressFilingIdentity(result.data,docId,query);return result;}
+    catch(error){if(error instanceof OmniContractError)Object.defineProperties(error,{requiresReconciliation:{value:true,enumerable:true},retryable:{value:false,enumerable:true},paymentOutcome:{value:"unconfirmed",enumerable:true}});throw error;}
+  }
   async marketAlertsData(symbol:string,query:PublicMarketAlertsQuery={}):Promise<OmniMcpDataResult<PublicMarketAlerts>>{const result=await this.callJsonTool<PublicMarketAlerts>("get_market_alerts",{...query,symbol});assertMarketAlertsIdentity(result.data,symbol);return result;}
   marketInstrumentsData(query:PublicMarketsQuery={}):Promise<OmniMcpDataResult<PublicMarketCatalog>>{return this.callJsonTool("list_market_instruments",{...query});}
   spotMarketInstrumentsData(query:PublicSpotMarketsQuery={}):Promise<OmniMcpDataResult<PublicSpotMarketCatalog>>{return this.callJsonTool("list_spot_market_instruments",{...query});}
@@ -212,6 +220,7 @@ export class OmniMcpClient {
 }
 
 const mcpToolContracts: Record<OmniMcpToolName, { service: string; schema?: string; requiredCollection?: string }> = {
+  get_congress_filing:{service:"omni.public_congress_filing",schema:"public_congress_filing.v1",requiredCollection:"rows"},
   get_market_alerts:{service:"omni.public_market_alerts",schema:"public_market_alerts.v1",requiredCollection:"events"},
   list_spot_market_instruments:{service:"omni.public_spot_market_catalog",schema:"public_spot_market_catalog.v1",requiredCollection:"rows"},
   get_spot_market_quote:{service:"omni.hyperliquid_spot_quote",schema:"hyperliquid_spot_quote.v1"},
@@ -320,6 +329,10 @@ export function validateMcpToolArguments(
   const input = assertArgumentObject(args);
 
   switch (name) {
+    case "get_congress_filing": {
+      assertOnlyKeys(name,input,["doc_id","limit","offset","public_revision"]);const {doc_id,...query}=input;validateCongressRequest(doc_id as string,query);return {...query,doc_id};
+    }
+
     case "get_market_alerts": {
       assertOnlyKeys(name,input,["symbol","limit","lookback_hours","before_timestamp","types"]);
       const {symbol,...query}=input;assertPublicMarketSymbol(symbol);validateMarketAlertsQuery(query as PublicMarketAlertsQuery);return{...query,symbol};
