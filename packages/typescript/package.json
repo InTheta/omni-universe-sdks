@@ -34,7 +34,7 @@
     "test:docs": "tsx scripts/verify-docs.ts ../..",
     "test:package": "tsx scripts/verify-package.ts",
     "pack:check": "npm pack --dry-run --json",
-    "verify": "npm run typecheck && npm test && npm run test:examples && npm run test:boundary && npm run test:docs && npm run test:package && npm audit --omit=dev",
+    "verify": "npm run prepare:coinbase && npm run typecheck && npm run test:coinbase-schemas && npm test && npm run test:examples && npm run test:boundary && npm run test:docs && npm run test:package && npm audit",
     "verify:live": "npm run verify && npm run example:rest:public && npm run example:ws && npm run example:x402:free && npm run example:mcp:free && npm run test:live && npm run pack:check",
     "example:rest": "node --env-file-if-exists=.env dist-examples/rest-api-key.js",
     "example:rest:public": "node --env-file-if-exists=.env dist-examples/rest-api-key.js --public-only",
@@ -56,7 +56,9 @@
     "example:reconciliation:free": "node --env-file-if-exists=.env dist-examples/agents/reconciliation-readonly.js",
     "example:research:free": "node --env-file-if-exists=.env dist-examples/agents/research-readonly.js --free-only",
     "example:guarded:preview": "node --env-file-if-exists=.env dist-examples/agents/guarded-execution.js --preview-only",
-    "example:lifecycle:recovery": "node --env-file-if-exists=.env dist-examples/agents/lifecycle-recovery.js"
+    "example:lifecycle:recovery": "node --env-file-if-exists=.env dist-examples/agents/lifecycle-recovery.js",
+    "prepare:coinbase": "node docs/migrate-coinbase-schemas.cjs",
+    "test:coinbase-schemas": "node docs/migrate-coinbase-schemas.cjs --check && node --test docs/test-coinbase-schemas.node.mjs"
   },
   "engines": {
     "node": ">=22.12"
@@ -91,11 +93,15 @@
   "license": "MIT",
   "sideEffects": false,
   "peerDependencies": {
-    "@coinbase/cdp-sdk": "^1.60.0"
+    "@coinbase/cdp-sdk": "1.60.0"
   },
   "peerDependenciesMeta": {
     "@coinbase/cdp-sdk": {
       "optional": true
     }
+  },
+  "overrides": {
+    "abitype": "1.3.0",
+    "zod": "$zod"
   }
 }

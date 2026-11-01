@@ -50,8 +50,27 @@ entry remains importable, including Robinhood, without it. Coinbase requests req
 installed optional peer, `@coinbase/cdp-sdk@^1.60.0`; a missing peer fails before any broker request.
 Development tests retain the peer so broker behavior is exercised.
 
-The Coinbase peer remains **unqualified for release security**: its latest dependency tree retains
-upstream Zod 3/abitype advisories. Making it optional does not repair those dependencies or qualify
-Coinbase trading. The packed public-data-only consumer is independently audited; package development
-audits must still disclose the optional broker dependency findings. No custody or trading acceptance
-is implied by public-data verification.
+Coinbase's unmodified peer still resolves vulnerable Zod 3/abitype versions. The broker refuses
+unqualified dependency versions or schema hashes before sending credentials to official JWT
+generation. To install the tested optional broker configuration, add these **consumer-root**
+overrides (library package overrides do not propagate), then install exact CDP 1.60.0:
+
+```json
+{"overrides":{"zod":"4.6.7","abitype":"1.3.0"}}
+```
+
+```sh
+npm install --ignore-scripts @coinbase/cdp-sdk@1.60.0
+node node_modules/@omni-terminal/sdk/docs/migrate-coinbase-schemas.cjs --root .
+node node_modules/@omni-terminal/sdk/docs/migrate-coinbase-schemas.cjs --root . --check
+node --test node_modules/@omni-terminal/sdk/docs/test-coinbase-schemas.node.mjs
+npm audit
+```
+
+The guarded migration changes one Zod record overload in each reviewed CDP ESM/CommonJS build.
+It verifies both original SHA-256 inputs before writing either file and refuses unknown upstream
+source. No JWT implementation is changed. Reapply after reinstalling dependencies and check before
+broker use. Repository `npm run verify` applies the same explicit preparation and tests both core
+and opt-in packed consumers, including signed synthetic JWT verification and fail-closed unpatched
+peer behavior. Both audited configurations report zero findings at qualification. This qualifies
+dependency compatibility only; it does not establish live brokerage or custody acceptance.

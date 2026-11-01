@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { TradingGateError } from "../errors.js";
 import { mergeSignals, parseResponse } from "../http.js";
 import type { OrderSide } from "../types.js";
+import { assertQualifiedCoinbaseDependency } from "./coinbase-security.js";
 
 export interface CoinbaseClientOptions {
   apiKey: string;
@@ -47,6 +48,7 @@ export class CoinbaseAdvancedTradeClient {
     } catch {
       throw new TradingGateError("Coinbase authentication requires the optional @coinbase/cdp-sdk peer dependency; install and security-qualify it before using this broker");
     }
+    assertQualifiedCoinbaseDependency();
     const token = await generateJwt({
       apiKeyId: this.apiKey,
       apiKeySecret: this.apiSecret,
