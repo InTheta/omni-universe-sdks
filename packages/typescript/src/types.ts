@@ -387,6 +387,7 @@ export interface LiquidationMap {
   clusters?: Record<string, unknown>;
   flow?: Array<Record<string, unknown>>;
   usage: Record<string, unknown>;
+  source_quality?:{liquidations:PublishedAnalysisInputQuality};
 }
 
 export interface TraderLeaderboard {
@@ -403,6 +404,7 @@ export interface TraderLeaderboard {
   ranking?: { basis: string; order: "ascending" | "descending"; pnl_currency: "USD"; realized_pnl_included: false; historical_performance_included: false };
   provenance?: { venue: "hyperliquid"; dataset: "public_position_snapshot"; population: string; observed_position_count: number | null; published_ranking_count: number; exhaustive_all_wallets: false };
   usage: Record<string, unknown>;
+  source_quality?:PublishedAnalysisInputQuality;
 }
 
 export interface MarketSnapshotCandle {
@@ -432,6 +434,7 @@ export interface MarketSnapshot {
   funding: MarketCarry;
   liquidation_overlay?: LiquidationMap | null;
   usage: Record<string, unknown>;
+  source_quality?:{liquidation_overlay:LiquidationMap['source_quality']|null};
 }
 
 export interface EntityResolutionItem {
@@ -473,7 +476,16 @@ export interface EntityResolution {
   usage: { mention_count: number; resolved_count: number; mention_limit: 20 };
 }
 
+export interface PublishedAnalysisInputQuality {
+  input_observation_status:"unknown";
+  source_observed_through:null;
+  complete_window:"unknown";
+  legacy_source_clock_coverage:"unknown";
+}
+
 export interface Freshness {
+  /** Publication freshness does not establish freshness of the underlying observations. */
+  basis?:string;
   status: "fresh" | "stale" | "historical" | "unknown";
   data_as_of?: string | null;
   age_seconds: number | null;
@@ -530,11 +542,12 @@ export interface MarketRisk {
   scope: "current" | "aggregate";
   generated_at: string;
   data_as_of: string | null;
-  freshness: Record<string, unknown>;
+  freshness: Record<string, unknown> & {basis?:string};
   liquidations: LiquidationMap;
   funding: MarketCarry;
   news: NewsPulse;
   usage: { event_window_minutes: 15 | 60; component_limit: number };
+  source_quality?:{liquidations:LiquidationMap['source_quality']};
 }
 
 export interface PublishedPremarketRoundup {
@@ -650,7 +663,7 @@ export interface PublicWalletGraphMetadata {
  methodology:{method:"nearest_neighbor_exposure_behavior_heuristic";run_id:string;graph_version:string;feature_version:string;model_version:string;algo_version:string;identity_proof:false;history_bucket_basis:"database_persistence_time"};
  source_quality:{source_observed_min:string;source_observed_through:string;history_observed_min:string;history_observed_through:string;live_rows:number;qualified_live_rows:number;history_rows:number;qualified_history_rows:number;population_complete:"unknown";complete_window:"unknown";excluded_population:"configured_observed_population_filter"};
  nodes:PublicWalletGraphNode[];
- coverage:{source_nodes:number;source_edges:number;returned_nodes:number;returned_edges:number;truncated:boolean;complete_graph:false;absence_means?:"not_present_in_observed_thresholded_graph"};
+ coverage:{source_nodes:number;source_edges:number;returned_nodes:number;returned_edges:number;truncated:boolean;byte_budget_truncated?:boolean;complete_graph:false;absence_means?:"not_present_in_observed_thresholded_graph"};
 }
 export interface PublicWalletGraph extends PublicWalletGraphMetadata {view:"graph";edges:PublicWalletGraphEdge[]}
 export interface PublicWalletPair extends PublicWalletGraphMetadata {view:"pair";wallet_a:string;wallet_b:string;pair:PublicWalletGraphEdge|null}
