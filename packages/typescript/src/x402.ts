@@ -1,3 +1,5 @@
+import type {PublicWalletGraph,PublicWalletPair,PublicWalletLinks,PublicWalletGraphQuery,PublicWalletLinksQuery} from "./types.js";
+import {walletGraphSymbol,walletGraphAddress,validateWalletGraphQuery,assertWalletGraphIdentity} from "./wallet-graph-contract.js";
 import type { PublicCongressFiling, PublicCongressQuery } from "./types.js";
 import type { PublicMarketAlerts, PublicMarketAlertsQuery } from "./types.js";
 import { decodePaymentRequiredHeader } from "@x402/core/http";
@@ -408,6 +410,16 @@ export class OmniX402Client {
     assertSpotPairIndex(pairIndex);validateSpotCandlesQuery(query);
     const result=await this.request<SpotCandles>("GET",`/api/x402/v1/spot-candles/${pairIndex}`,{query,contract:{service:"omni.hyperliquid_spot_candles",schema:"hyperliquid_spot_candles.v1",requiredCollection:"candles"}});
     assertSpotResultIdentity(result.data,pairIndex);return result;
+  }
+
+  async walletGraph(rawSymbol:string,query:PublicWalletGraphQuery={}):Promise<PaidResult<PublicWalletGraph>> {
+    const symbol=walletGraphSymbol(rawSymbol);validateWalletGraphQuery(query,"graph");const result=await this.request<PublicWalletGraph>("GET",`/api/x402/v1/wallet-graph/${symbol}`,{query:{...query},contract:{service:"omni.public_wallet_graph",schema:"public_wallet_graph.v1",requiredCollection:"nodes"}});assertWalletGraphIdentity(result.data,symbol,"graph",query);return result;
+  }
+  async walletPair(rawSymbol:string,rawA:string,rawB:string):Promise<PaidResult<PublicWalletPair>> {
+    const symbol=walletGraphSymbol(rawSymbol),a=walletGraphAddress(rawA),b=walletGraphAddress(rawB);if(a===b)throw new RangeError("wallet pair requires distinct public addresses");const result=await this.request<PublicWalletPair>("GET",`/api/x402/v1/wallet-pair/${symbol}/${a}/${b}`,{contract:{service:"omni.public_wallet_graph",schema:"public_wallet_graph.v1",requiredCollection:"nodes"}});assertWalletGraphIdentity(result.data,symbol,"pair",{},a,b);return result;
+  }
+  async walletLinks(rawSymbol:string,rawAddress:string,query:PublicWalletLinksQuery={}):Promise<PaidResult<PublicWalletLinks>> {
+    const symbol=walletGraphSymbol(rawSymbol),address=walletGraphAddress(rawAddress);validateWalletGraphQuery(query,"links");const result=await this.request<PublicWalletLinks>("GET",`/api/x402/v1/wallet-links/${symbol}/${address}`,{query:{...query},contract:{service:"omni.public_wallet_graph",schema:"public_wallet_graph.v1",requiredCollection:"nodes"}});assertWalletGraphIdentity(result.data,symbol,"links",query,address);return result;
   }
 
   async congressFiling(docId:string,query:PublicCongressQuery={}):Promise<PaidResult<PublicCongressFiling>> {

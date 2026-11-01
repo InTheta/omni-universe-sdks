@@ -637,3 +637,22 @@ export interface PublicCongressFiling {
  coverage:{parser_completed:true;document_rows_complete:"unknown";global_completeness:"unknown";amendment_status:"unknown";source_parsed_row_count:number};
  capabilities:{chambers:readonly ["House"]|readonly string[];source:"house_clerk";lookup:"official_document_id";discovery:"not_available";coverage:"cached_parsed_documents_only";document_rows_complete:"unknown";global_completeness:"unknown";amendment_status:"unknown";amount_semantics:"reported_USD_range_or_amount_not_execution_value";senate:"unqualified"};
 }
+
+export type PublicWalletGraphSymbol="BTC"|"ETH"|"SOL";
+export interface PublicWalletGraphQuery {limit?:number;edge_limit?:number}
+export interface PublicWalletLinksQuery {limit?:number}
+export interface PublicWalletGraphNode {address:string;gross_source_notional:number;net_source_notional:number;notional_currency:null;notional_basis:"upstream_position_value_aggregate_quote_identity_unknown"}
+export interface PublicWalletGraphEdge {source:string;target:string;relation:"behavioral_similarity"|"direction_alignment"|"direction_opposition";heuristic_score:number;overlap_score:number;size_similarity_score:number;identity_confirmed:false;correlation:null;timing_synchronization:null;unavailable_metrics:readonly ["correlation","timing_synchronization"]}
+export interface PublicWalletGraphMetadata {
+ service:"omni.public_wallet_graph";schema:"public_wallet_graph.v1";product_version:"v1";symbol:PublicWalletGraphSymbol;window:"24h";bucket:"5m";
+ generated_at:string;artifact_generated_at:string;data_as_of:string;freshness:Freshness&{basis:"hyperliquid_clearinghouse_state_time_v1"};
+ market_scope:"observed_hyperliquid_perpetual_base_symbol_across_dexes";
+ methodology:{method:"nearest_neighbor_exposure_behavior_heuristic";run_id:string;graph_version:string;feature_version:string;model_version:string;algo_version:string;identity_proof:false;history_bucket_basis:"database_persistence_time"};
+ source_quality:{source_observed_min:string;source_observed_through:string;history_observed_min:string;history_observed_through:string;live_rows:number;qualified_live_rows:number;history_rows:number;qualified_history_rows:number;population_complete:"unknown";complete_window:"unknown";excluded_population:"configured_observed_population_filter"};
+ nodes:PublicWalletGraphNode[];
+ coverage:{source_nodes:number;source_edges:number;returned_nodes:number;returned_edges:number;truncated:boolean;complete_graph:false;absence_means?:"not_present_in_observed_thresholded_graph"};
+}
+export interface PublicWalletGraph extends PublicWalletGraphMetadata {view:"graph";edges:PublicWalletGraphEdge[]}
+export interface PublicWalletPair extends PublicWalletGraphMetadata {view:"pair";wallet_a:string;wallet_b:string;pair:PublicWalletGraphEdge|null}
+export interface PublicWalletLinks extends PublicWalletGraphMetadata {view:"links";address:string;links:PublicWalletGraphEdge[]}
+export type PublicWalletGraphResult=PublicWalletGraph|PublicWalletPair|PublicWalletLinks;

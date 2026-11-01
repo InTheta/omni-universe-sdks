@@ -1,3 +1,5 @@
+import type {PublicWalletGraph,PublicWalletPair,PublicWalletLinks,PublicWalletGraphQuery,PublicWalletLinksQuery} from "./types.js";
+import {walletGraphSymbol,walletGraphAddress,validateWalletGraphQuery,assertWalletGraphIdentity,walletGraphPaidFailure} from "./wallet-graph-contract.js";
 import type { PublicCongressFiling, PublicCongressQuery } from "./types.js";
 import {validateCongressRequest,assertCongressFilingIdentity} from "./x402.js";
 import type { PublicMarketAlerts, PublicMarketAlertsQuery } from "./types.js";
@@ -12,6 +14,7 @@ import { createEvmPaymentClient, DEFAULT_MAX_X402_PAYMENT_USD, validatePaymentSe
 import type { PublicMarketCatalog, PublicMarketsQuery, L4BookSnapshot, RealizedLiquidations, LiquidationWindow, PublicSpotMarketCatalog, PublicSpotMarketsQuery, SpotMarketQuote, SpotCandles, SpotCandleInterval } from "./types.js";
 
 export type OmniMcpToolName =
+  | "get_wallet_graph" | "get_wallet_pair" | "get_wallet_links"
   | "get_congress_filing"
   | "get_market_catalog"
   | "list_market_instruments"
@@ -152,6 +155,15 @@ export class OmniMcpClient {
   catalogData(): Promise<OmniMcpDataResult<OmniMcpMarketCatalog>> {
     return this.callJsonTool("get_market_catalog");
   }
+  async walletGraphData(rawSymbol:string,query:PublicWalletGraphQuery={}):Promise<OmniMcpDataResult<PublicWalletGraph>> {
+    const symbol=walletGraphSymbol(rawSymbol);validateWalletGraphQuery(query,"graph");try{const result=await this.callJsonTool<PublicWalletGraph>("get_wallet_graph",{...query,symbol});assertWalletGraphIdentity(result.data,symbol,"graph",query);return result;}catch(error){return walletGraphPaidFailure(error);}
+  }
+  async walletPairData(rawSymbol:string,rawA:string,rawB:string):Promise<OmniMcpDataResult<PublicWalletPair>> {
+    const symbol=walletGraphSymbol(rawSymbol),a=walletGraphAddress(rawA),b=walletGraphAddress(rawB);if(a===b)throw new RangeError("wallet pair requires distinct public addresses");try{const result=await this.callJsonTool<PublicWalletPair>("get_wallet_pair",{symbol,address_a:a,address_b:b});assertWalletGraphIdentity(result.data,symbol,"pair",{},a,b);return result;}catch(error){return walletGraphPaidFailure(error);}
+  }
+  async walletLinksData(rawSymbol:string,rawAddress:string,query:PublicWalletLinksQuery={}):Promise<OmniMcpDataResult<PublicWalletLinks>> {
+    const symbol=walletGraphSymbol(rawSymbol),address=walletGraphAddress(rawAddress);validateWalletGraphQuery(query,"links");try{const result=await this.callJsonTool<PublicWalletLinks>("get_wallet_links",{...query,symbol,address});assertWalletGraphIdentity(result.data,symbol,"links",query,address);return result;}catch(error){return walletGraphPaidFailure(error);}
+  }
   async congressFilingData(docId:string,query:PublicCongressQuery={}):Promise<OmniMcpDataResult<PublicCongressFiling>> {
     validateCongressRequest(docId,query);
     try {const result=await this.callJsonTool<PublicCongressFiling>("get_congress_filing",{...query,doc_id:docId});assertCongressFilingIdentity(result.data,docId,query);return result;}
@@ -220,6 +232,9 @@ export class OmniMcpClient {
 }
 
 const mcpToolContracts: Record<OmniMcpToolName, { service: string; schema?: string; requiredCollection?: string }> = {
+  get_wallet_graph:{service:"omni.public_wallet_graph",schema:"public_wallet_graph.v1",requiredCollection:"nodes"},
+  get_wallet_pair:{service:"omni.public_wallet_graph",schema:"public_wallet_graph.v1",requiredCollection:"nodes"},
+  get_wallet_links:{service:"omni.public_wallet_graph",schema:"public_wallet_graph.v1",requiredCollection:"nodes"},
   get_congress_filing:{service:"omni.public_congress_filing",schema:"public_congress_filing.v1",requiredCollection:"rows"},
   get_market_alerts:{service:"omni.public_market_alerts",schema:"public_market_alerts.v1",requiredCollection:"events"},
   list_spot_market_instruments:{service:"omni.public_spot_market_catalog",schema:"public_spot_market_catalog.v1",requiredCollection:"rows"},
@@ -329,6 +344,10 @@ export function validateMcpToolArguments(
   const input = assertArgumentObject(args);
 
   switch (name) {
+    case "get_wallet_graph": {assertOnlyKeys(name,input,["symbol","limit","edge_limit"]);const {symbol,...query}=input;validateWalletGraphQuery(query,"graph");return {...query,symbol:walletGraphSymbol(symbol)};}
+    case "get_wallet_pair": {assertOnlyKeys(name,input,["symbol","address_a","address_b"]);const a=walletGraphAddress(input.address_a),b=walletGraphAddress(input.address_b);if(a===b)throw new RangeError("wallet pair requires distinct public addresses");return {symbol:walletGraphSymbol(input.symbol),address_a:a,address_b:b};}
+    case "get_wallet_links": {assertOnlyKeys(name,input,["symbol","address","limit"]);const {symbol,address,...query}=input;validateWalletGraphQuery(query,"links");return {...query,symbol:walletGraphSymbol(symbol),address:walletGraphAddress(address)};}
+
     case "get_congress_filing": {
       assertOnlyKeys(name,input,["doc_id","limit","offset","public_revision"]);const {doc_id,...query}=input;validateCongressRequest(doc_id as string,query);return {...query,doc_id};
     }
