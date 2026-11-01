@@ -19,6 +19,7 @@ import type {
   L4BookSnapshot,
   RealizedLiquidations,
   LiquidationWindow,
+  PublicSpotMarketsQuery, PublicSpotMarketCatalog, SpotMarketQuote, SpotCandles, SpotCandleInterval,
   NewsPulse,
   PaidResult,
   PaymentReceipt,
@@ -390,6 +391,23 @@ export class OmniX402Client {
     return result;
   }
 
+  async spotMarketInstruments(query:PublicSpotMarketsQuery={}):Promise<PaidResult<PublicSpotMarketCatalog>>{
+    validateSpotMarketsQuery(query);
+    const result=await this.request<PublicSpotMarketCatalog>("GET","/api/x402/v1/spot-markets",{query:{...query},contract:{service:"omni.public_spot_market_catalog",requiredCollection:"rows"}});
+    if(result.data.schema!=="public_spot_market_catalog.v1")throw new OmniContractError("Invalid public spot catalog schema","/api/x402/v1/spot-markets",undefined);
+    return result;
+  }
+  async spotMarketQuote(pairIndex:number,query:{depth?:number}={}):Promise<PaidResult<SpotMarketQuote>>{
+    assertSpotPairIndex(pairIndex);assertOptionalInteger("depth",query.depth,1,20);
+    const result=await this.request<SpotMarketQuote>("GET",`/api/x402/v1/spot-quote/${pairIndex}`,{query,contract:{service:"omni.hyperliquid_spot_quote",schema:"hyperliquid_spot_quote.v1"}});
+    assertSpotResultIdentity(result.data,pairIndex);return result;
+  }
+  async spotCandles(pairIndex:number,query:{interval?:SpotCandleInterval;limit?:number}={}):Promise<PaidResult<SpotCandles>>{
+    assertSpotPairIndex(pairIndex);validateSpotCandlesQuery(query);
+    const result=await this.request<SpotCandles>("GET",`/api/x402/v1/spot-candles/${pairIndex}`,{query,contract:{service:"omni.hyperliquid_spot_candles",schema:"hyperliquid_spot_candles.v1",requiredCollection:"candles"}});
+    assertSpotResultIdentity(result.data,pairIndex);return result;
+  }
+
   fundingHistory(symbol:PublicMarketSymbol,query:{lookback_hours?:number;limit?:number}={}):Promise<PaidResult<FundingHistory>>{
     assertPublicMarketSymbol(symbol);assertOptionalInteger("lookback_hours",query.lookback_hours,1,168);assertOptionalInteger("limit",query.limit,1,168);
     return this.request("GET",`/api/x402/v1/funding-history/${encodeURIComponent(symbol)}`,{query,contract:{service:"omni.hyperliquid_funding_history",schema:"hyperliquid_funding_history.v1",requiredCollection:"rows"}});
@@ -523,6 +541,13 @@ export function validatePublicMarketsQuery(query:PublicMarketsQuery):void{
   if(query.search!==undefined&&(typeof query.search!=="string"||query.search.length>40||/[\u0000-\u001f\u007f]/.test(query.search)))throw new RangeError("invalid market search");
   if(query.dex!==undefined&&(typeof query.dex!=="string"||!/^[a-zA-Z0-9_-]{1,24}$/.test(query.dex)))throw new RangeError("invalid dex");
 }
+export function assertSpotPairIndex(value:unknown):asserts value is number {if(typeof value!=="number"||!Number.isSafeInteger(value)||value<0||value>9999999)throw new RangeError("pair_index must be an exact public spot pair index");}
+export function assertSpotResultIdentity(value:{market?:unknown},pairIndex:number):void {
+  const m=value.market as Record<string,unknown>|undefined;
+  if(!m||m.market_id!==`hyperliquid:spot:${pairIndex}`||m.market_type!=="spot"||m.pair_index!==pairIndex||m.source_coin!==(pairIndex===0?"PURR/USDC":`@${pairIndex}`))throw unconfirmedPaidResponse(new OmniContractError("Paid spot response has a different market identity",`spot:${pairIndex}`,undefined));
+}
+export function validateSpotCandlesQuery(query:{interval?:SpotCandleInterval;limit?:number}){assertOptionalOneOf("interval",query.interval,["1m","5m","15m","1h","4h","1d"]);assertOptionalInteger("limit",query.limit,1,200);}
+export function validateSpotMarketsQuery(query:PublicSpotMarketsQuery){for(const k of Object.keys(query))if(!["limit","offset","revision"].includes(k))throw new RangeError("unknown spot market query");assertOptionalInteger("limit",query.limit,1,25);assertOptionalInteger("offset",query.offset,0,10000);if(query.revision!==undefined&&(typeof query.revision!=="string"||!/^[a-f0-9]{64}$/.test(query.revision)))throw new RangeError("spot metadata revision must be sha256");}
 export function validateLiquidationWindows(windows:unknown):void{
   if(windows===undefined)return;
   if(!Array.isArray(windows)||windows.length<1||windows.length>4||new Set(windows).size!==windows.length||windows.some(v=>!["1m","5m","15m","1h"].includes(String(v))))throw new RangeError("windows must contain one to four unique supported windows");

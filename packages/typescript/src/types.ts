@@ -51,6 +51,31 @@ export interface FundingHistory {
   provenance:Record<string,unknown>;
 }
 export type LiquidationWindow="1m"|"5m"|"15m"|"1h";
+export type SpotCandleInterval="1m"|"5m"|"15m"|"1h"|"4h"|"1d";
+export interface SpotTokenIdentity {index:number;token_id:string;name:string;size_decimals:number;is_canonical:boolean}
+export interface SpotMarketIdentity {market_id:string;market_type:"spot";pair_index:number;source_coin:string;base:SpotTokenIdentity;quote:SpotTokenIdentity;is_canonical_pair:boolean}
+export interface PublicSpotMarketsQuery {limit?:number;offset?:number;revision?:string}
+export interface PublicSpotMarketCatalog {
+  service:"omni.public_spot_market_catalog";schema:"public_spot_market_catalog.v1";product_version:"v1";
+  observed_at:string;metadata_revision:string;freshness:Freshness;source_timestamp_available:false;
+  rows:Array<SpotMarketIdentity&{eligible_products:string[];availability_evaluated:false}>;
+  pagination:{offset:number;limit:number;total:number;next_offset:number|null};private_contexts_included:false;
+}
+export interface SpotMarketQuote {
+  service:"omni.hyperliquid_spot_quote";schema:"hyperliquid_spot_quote.v1";product_version:"v1";market:SpotMarketIdentity;
+  generated_at:string;data_as_of:string;freshness:Freshness;
+  quote:{best_bid:number;best_ask:number;midpoint:number;spread:number;price_unit:"quote_token"};
+  depth:{limit:number;bids:Array<{price:number;size:number;order_count:number}>;asks:Array<{price:number;size:number;order_count:number}>;complete_book:false};
+  context:{mark_price:number;previous_day_price:number;day_notional_volume_in_quote:number;day_base_volume:number|null;exchange_timestamp:null;observation_received_at:string;freshness_status:"unknown"};
+  quality:Record<string,unknown>;provenance:Record<string,unknown>;
+}
+export interface SpotCandles {
+  service:"omni.hyperliquid_spot_candles";schema:"hyperliquid_spot_candles.v1";product_version:"v1";market:SpotMarketIdentity;interval:SpotCandleInterval;
+  generated_at:string;source_snapshot_observed_at:string;data_as_of:string|null;freshness:Freshness;from_timestamp:number;to_timestamp:number;
+  candles:Array<{open_time:number;close_time:number;open:number;high:number;low:number;close:number;volume:number;trades:number;period_complete:boolean}>;
+  quality:{source_returned_count:number;returned_count:number;truncated:boolean;empty:boolean;source_window_complete:false;interior_gap_count:number;requested_interval_count:number;missing_observations_estimate:number;freshness_basis:"latest_completed_candle_period_end";current_period_included:boolean;last_mutation_timestamp_available:false};
+  semantics:{price_unit:"quote_token";volume_unit:"base_token";open_period_may_change:true};provenance:Record<string,unknown>;
+}
 export interface L4BookSnapshot {
   service:"omni.hyperliquid_l4_snapshot";schema:"hyperliquid_l4_snapshot.v1";product_version:"v1";symbol:string;venue:"hyperliquid";generated_at:string;data_as_of:string;freshness:Freshness;snapshot_block_height:string;
   bids:Array<{order_id:string;maker_address:string;price:number;size:number;notional_usd:number;created_at:string}>;

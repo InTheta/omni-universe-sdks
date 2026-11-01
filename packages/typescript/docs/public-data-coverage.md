@@ -21,6 +21,14 @@ windows (`1m`, `5m`, `15m`, `1h`), actual event bounds and source watermark sema
 counterparts are `l4BookSnapshotData` and `realizedLiquidationsData`. The seller rejects an older,
 unqualified liquidation source contract rather than labeling its windows complete.
 
+Spot uses separate explicit pair identities: `spotMarketInstruments()` returns a bounded free
+catalog with pair index, token IDs and SHA-256 metadata revision. `spotMarketQuote(pairIndex)` and
+`spotCandles(pairIndex, { interval, limit })` never infer a perpetual ticker. MCP uses the matching
+`spotMarketInstrumentsData`, `spotMarketQuoteData` and `spotCandlesData` methods. Book timestamps
+qualify quote freshness; attached context has observation-only freshness. Candle freshness uses
+the last completed period; the included current candle can change. Metadata has no invented source
+timestamp. Prices and notionals are in the quote token, not necessarily US dollars.
+
 MCP adds direct profile, leaderboard, liquidation map and market snapshot JSON recipes. Use
 `screenshotData(toolName, args)` for the three native image tools. The client requires a successful
 settlement, bounded PNG bytes and metadata matching the exact product. A valid PNG is not proof

@@ -60,3 +60,25 @@ test("orderflow recipes preserve exact namespace and reject unbounded or ambiguo
   assert.throws(()=>validateMcpToolArguments("get_realized_liquidations",{symbol:"BTC",windows:["24h"]}));
   assert.deepEqual(validateMcpToolArguments("get_realized_liquidations",{symbol:"xyz:SPCX",windows:["1m","1h"]}),{symbol:"xyz:SPCX",windows:["1m","1h"]});
 });
+
+test("spot recipes use explicit pair indices and keep metadata discovery unsigned",async()=>{
+  const seen:URL[]=[];
+  const client=new OmniX402Client({paymentClient:new x402Client(),fetch:async(input)=>{
+    const u=new URL(input instanceof Request?input.url:String(input));seen.push(u);
+    if(u.pathname.endsWith("spot-markets"))return Response.json({service:"omni.public_spot_market_catalog",schema:"public_spot_market_catalog.v1",rows:[]});
+    const candle=u.pathname.includes("spot-candles");
+    return Response.json({service:candle?"omni.hyperliquid_spot_candles":"omni.hyperliquid_spot_quote",schema:candle?"hyperliquid_spot_candles.v1":"hyperliquid_spot_quote.v1",market:{market_id:`hyperliquid:spot:${u.pathname.split("/").at(-1)}`,market_type:"spot",pair_index:Number(u.pathname.split("/").at(-1)),source_coin:u.pathname.endsWith("/0")?"PURR/USDC":"@"+u.pathname.split("/").at(-1)},...(candle?{candles:[]}:{})},{headers:{"payment-response":encodePaymentResponseHeader(receipt)}});
+  }});
+  assert.equal((await client.spotMarketInstruments({limit:25,revision:"a".repeat(64)})).payment,null);
+  await client.spotMarketQuote(0,{depth:20});await client.spotCandles(107,{interval:"5m",limit:200});
+  assert.equal(seen[1]?.pathname,"/api/x402/v1/spot-quote/0");assert.equal(seen[2]?.pathname,"/api/x402/v1/spot-candles/107");
+  for(const index of [-1,1.5,10000000,NaN])await assert.rejects(client.spotMarketQuote(index));
+  await assert.rejects(client.spotCandles(0,{limit:201}));
+  assert.throws(()=>validateMcpToolArguments("get_spot_market_quote",{symbol:"BTC",pair_index:0}));
+  assert.throws(()=>validateMcpToolArguments("get_spot_candles",{pair_index:"107"}));
+  assert.throws(()=>validateMcpToolArguments("list_spot_market_instruments",{revision:"123"}));
+  assert.deepEqual(validateMcpToolArguments("get_spot_candles",{pair_index:107,interval:"5m",limit:200}),{pair_index:107,interval:"5m",limit:200});
+  assert.throws(()=>validateMcpToolResult("list_spot_market_instruments",{content:[{type:"text",text:"{}"}],paymentMade:true,paymentResponse:receipt}),OmniContractError);
+  const wrong=new OmniX402Client({paymentClient:new x402Client(),fetch:async()=>Response.json({service:"omni.hyperliquid_spot_quote",schema:"hyperliquid_spot_quote.v1",market:{market_id:"hyperliquid:spot:1",market_type:"spot",pair_index:1,source_coin:"@1"}},{headers:{"payment-response":encodePaymentResponseHeader(receipt)}})});
+  await assert.rejects(wrong.spotMarketQuote(0),(e:unknown)=>{assert(e instanceof OmniContractError);assert.equal(e.requiresReconciliation,true);assert.equal(e.retryable,false);return true;});
+});

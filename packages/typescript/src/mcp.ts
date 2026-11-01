@@ -4,12 +4,13 @@ import { x402Client } from "@x402/core/client";
 import { wrapMCPClientWithPayment, type PaymentRequestedContext, type SettleResponse, type x402MCPClient, type x402MCPToolCallResult } from "@x402/mcp";
 import { OmniContractError } from "./errors.js";
 import type { EntityResolution, MarketCarry, MarketRisk, NewsPulse, PremarketRoundup, PremarketRoundupQuery, TraderLeaderboard, TraderProfile, LiquidationMap, MarketSnapshot, MarketMicrostructure, FundingHistory } from "./types.js";
-import { createEvmPaymentClient, DEFAULT_MAX_X402_PAYMENT_USD, validatePaymentSettlement, assertPublicMarketSymbol, validatePublicMarketsQuery, validateLiquidationWindows, type ScreenshotPng } from "./x402.js";
-import type { PublicMarketCatalog, PublicMarketsQuery, L4BookSnapshot, RealizedLiquidations, LiquidationWindow } from "./types.js";
+import { createEvmPaymentClient, DEFAULT_MAX_X402_PAYMENT_USD, validatePaymentSettlement, assertPublicMarketSymbol, validatePublicMarketsQuery, validateLiquidationWindows, assertSpotPairIndex, assertSpotResultIdentity, validateSpotCandlesQuery, validateSpotMarketsQuery, type ScreenshotPng } from "./x402.js";
+import type { PublicMarketCatalog, PublicMarketsQuery, L4BookSnapshot, RealizedLiquidations, LiquidationWindow, PublicSpotMarketCatalog, PublicSpotMarketsQuery, SpotMarketQuote, SpotCandles, SpotCandleInterval } from "./types.js";
 
 export type OmniMcpToolName =
   | "get_market_catalog"
   | "list_market_instruments"
+  | SpotMcpToolName
   | "get_market_moving_events"
   | "get_market_risk_context"
   | "resolve_market_entities"
@@ -17,6 +18,7 @@ export type OmniMcpToolName =
   | "get_premarket_roundup"
   | PublicJsonMcpToolName
   | ScreenshotMcpToolName;
+export type SpotMcpToolName="get_spot_market_quote"|"get_spot_candles"|"list_spot_market_instruments";
 export type PublicJsonMcpToolName="get_trader_leaderboard"|"get_trader_profile"|"get_liquidation_map"|"get_market_snapshot"|"get_market_microstructure"|"get_funding_history"|"get_l4_orderbook"|"get_realized_liquidations";
 export type ScreenshotMcpToolName="get_liquidation_levels_screenshot"|"get_liquidation_bucket_screenshot"|"get_trader_profile_screenshot";
 export type PublicMcpToolName=OmniMcpToolName|PublicJsonMcpToolName|ScreenshotMcpToolName;
@@ -102,7 +104,7 @@ export class OmniMcpClient {
     this.client = wrapMCPClientWithPayment(rawClient, paymentClient, {
       autoPayment: true,
       onPaymentRequested: async (context) => {
-        if (["get_market_catalog","list_market_instruments"].includes(context.toolName)) {
+        if (["get_market_catalog","list_market_instruments","list_spot_market_instruments"].includes(context.toolName)) {
           throw new OmniContractError("A free MCP discovery tool unexpectedly requested payment", `mcp:${context.toolName}`, context.paymentRequired);
         }
         return options.approvePayment ? options.approvePayment(context) : false;
@@ -146,6 +148,9 @@ export class OmniMcpClient {
     return this.callJsonTool("get_market_catalog");
   }
   marketInstrumentsData(query:PublicMarketsQuery={}):Promise<OmniMcpDataResult<PublicMarketCatalog>>{return this.callJsonTool("list_market_instruments",{...query});}
+  spotMarketInstrumentsData(query:PublicSpotMarketsQuery={}):Promise<OmniMcpDataResult<PublicSpotMarketCatalog>>{return this.callJsonTool("list_spot_market_instruments",{...query});}
+  async spotMarketQuoteData(pairIndex:number,query:{depth?:number}={}):Promise<OmniMcpDataResult<SpotMarketQuote>>{const result=await this.callJsonTool<SpotMarketQuote>("get_spot_market_quote",{...query,pair_index:pairIndex});assertSpotResultIdentity(result.data,pairIndex);return result;}
+  async spotCandlesData(pairIndex:number,query:{interval?:SpotCandleInterval;limit?:number}={}):Promise<OmniMcpDataResult<SpotCandles>>{const result=await this.callJsonTool<SpotCandles>("get_spot_candles",{...query,pair_index:pairIndex});assertSpotResultIdentity(result.data,pairIndex);return result;}
 
   marketMovingEvents(args: { symbol?: string; market?: "crypto" | "equities" | "macro" | "forex"; limit?: number; lookback_hours?: number; event_window_minutes?: 15 | 60 }): Promise<x402MCPToolCallResult> {
     return this.callTool("get_market_moving_events", args);
@@ -204,6 +209,9 @@ export class OmniMcpClient {
 }
 
 const mcpToolContracts: Record<OmniMcpToolName, { service: string; schema?: string; requiredCollection?: string }> = {
+  list_spot_market_instruments:{service:"omni.public_spot_market_catalog",schema:"public_spot_market_catalog.v1",requiredCollection:"rows"},
+  get_spot_market_quote:{service:"omni.hyperliquid_spot_quote",schema:"hyperliquid_spot_quote.v1"},
+  get_spot_candles:{service:"omni.hyperliquid_spot_candles",schema:"hyperliquid_spot_candles.v1",requiredCollection:"candles"},
   list_market_instruments:{service:"omni.public_market_catalog",schema:"public_market_catalog.v1",requiredCollection:"rows"},
   get_trader_leaderboard:{service:"omni.hyperliquid_trader_leaderboard",schema:"hyperliquid_trader_leaderboard.v1",requiredCollection:"rows"},
   get_trader_profile:{service:"omni.trader_profile",schema:"trader_profile.v1",requiredCollection:"positions"},
@@ -239,7 +247,7 @@ export function validateMcpToolResult(
   if (record.isError === true) {
     throw new OmniContractError(`MCP tool ${name} returned an error`, route, result);
   }
-  const paid = name !== "get_market_catalog" && name !== "list_market_instruments";
+  const paid = name !== "get_market_catalog" && name !== "list_market_instruments" && name !== "list_spot_market_instruments";
   if (paid && record.paymentMade !== true) {
     throw new OmniContractError(`Paid MCP tool ${name} returned without payment`, route, result);
   }
@@ -314,6 +322,12 @@ export function validateMcpToolArguments(
     case "list_market_instruments":
       validatePublicMarketsQuery(input as PublicMarketsQuery);
       return {...input};
+    case "list_spot_market_instruments":
+      validateSpotMarketsQuery(input as PublicSpotMarketsQuery);return{...input};
+    case "get_spot_market_quote":
+      assertOnlyKeys(name,input,["pair_index","depth"]);assertSpotPairIndex(input.pair_index);assertOptionalInteger("depth",input.depth,1,20);return{...input};
+    case "get_spot_candles":
+      assertOnlyKeys(name,input,["pair_index","interval","limit"]);assertSpotPairIndex(input.pair_index);validateSpotCandlesQuery(input as {interval?:SpotCandleInterval;limit?:number});return{...input};
     case "get_market_moving_events": {
       assertOnlyKeys(name, input, ["symbol", "market", "limit", "lookback_hours", "event_window_minutes"]);
       const output = { ...input };
