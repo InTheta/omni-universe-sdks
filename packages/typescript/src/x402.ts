@@ -11,6 +11,11 @@ import type {
   MarketCarry,
   MarketRisk,
   MarketSnapshot,
+  MarketMicrostructure,
+  FundingHistory,
+  PublicMarketSymbol,
+  PublicMarketCatalog,
+  PublicMarketsQuery,
   NewsPulse,
   PaidResult,
   PaymentReceipt,
@@ -28,7 +33,7 @@ export interface LiquidationLevelsScreenshotQuery {
   interval?: "1m" | "5m" | "15m" | "1h" | "2h" | "4h" | "8h" | "1d" | "3d" | "1w" | "1M";
   scope?: "current" | "aggregate"; layout?: "compact" | "standard" | "tall";
 }
-export interface LiquidationBucketScreenshotQuery { price: number; side?: "all" | "buy" | "sell"; scope?: "current" | "aggregate" }
+export interface LiquidationBucketScreenshotQuery { price: number; price_end?:number; bucket_size?:number; side?: "all" | "buy" | "sell"; scope?: "current" | "aggregate" }
 export interface TraderProfileScreenshotQuery { symbol?: X402Symbol; range?: "1d" | "7d" | "30d" | "all"; tab?: "positions" | "pnl" | "balance" | "mixed"; mode?: "chart" | "stats" | "full_stats" }
 
 export interface OmniX402ClientOptions {
@@ -278,7 +283,7 @@ export class OmniX402Client {
   }
 
   liquidationMap(
-    symbol: X402Symbol,
+    symbol: PublicMarketSymbol,
     query: {
       scope?: "current" | "aggregate";
       view?: "summary" | "buckets" | "clusters" | "flow";
@@ -288,7 +293,7 @@ export class OmniX402Client {
       side?: "all" | "long" | "short";
     } = {},
   ): Promise<PaidResult<LiquidationMap>> {
-    assertSymbol(symbol);
+    assertPublicMarketSymbol(symbol);
     assertOptionalOneOf("scope", query.scope, ["current", "aggregate"]);
     assertOptionalOneOf("view", query.view, ["summary", "buckets", "clusters", "flow"]);
     assertOptionalOneOf("order", query.order, ["strongest", "nearest", "price"]);
@@ -304,10 +309,10 @@ export class OmniX402Client {
   }
 
   traderLeaderboard(
-    symbol: X402Symbol,
+    symbol: PublicMarketSymbol,
     query: { scope?: "current" | "aggregate"; rank?: "best" | "worst" | "largest" | "largest_size" | "wallet_size" | "risk" | "closest"; limit?: number } = {},
   ): Promise<PaidResult<TraderLeaderboard>> {
-    assertSymbol(symbol);
+    assertPublicMarketSymbol(symbol);
     assertOptionalOneOf("scope", query.scope, ["current", "aggregate"]);
     assertOptionalOneOf("rank", query.rank, ["best", "worst", "largest", "largest_size", "wallet_size", "risk", "closest"]);
     assertOptionalInteger("limit", query.limit, 1, 20);
@@ -332,10 +337,10 @@ export class OmniX402Client {
   }
 
   marketSnapshot(
-    symbol: X402Symbol,
+    symbol: PublicMarketSymbol,
     query: { interval?: "1m" | "5m" | "15m" | "1h" | "2h" | "4h" | "8h" | "1d" | "3d" | "1w" | "1M"; limit?: number; scope?: "current" | "aggregate"; include_liquidations?: boolean } = {},
   ): Promise<PaidResult<MarketSnapshot>> {
-    assertSymbol(symbol);
+    assertPublicMarketSymbol(symbol);
     assertOptionalOneOf("interval", query.interval, ["1m", "5m", "15m", "1h", "2h", "4h", "8h", "1d", "3d", "1w", "1M"]);
     assertOptionalOneOf("scope", query.scope, ["current", "aggregate"]);
     assertOptionalInteger("limit", query.limit, 20, 200);
@@ -363,11 +368,28 @@ export class OmniX402Client {
     });
   }
 
-  marketCarry(symbol: X402Symbol): Promise<PaidResult<MarketCarry>> {
-    assertSymbol(symbol);
+  marketCarry(symbol: PublicMarketSymbol): Promise<PaidResult<MarketCarry>> {
+    assertPublicMarketSymbol(symbol);
     return this.request("GET", `/api/x402/v1/market-carry/${symbol}`, {
       contract: { service: "omni.hyperliquid_market_carry", schema: "hyperliquid_market_carry.v1" },
     });
+  }
+
+  marketMicrostructure(symbol:PublicMarketSymbol,query:{depth?:number;trade_limit?:number;trade_window_seconds?:number}={}):Promise<PaidResult<MarketMicrostructure>>{
+    assertPublicMarketSymbol(symbol);assertOptionalInteger("depth",query.depth,1,50);assertOptionalInteger("trade_limit",query.trade_limit,1,100);assertOptionalInteger("trade_window_seconds",query.trade_window_seconds,1,3600);
+    return this.request("GET",`/api/x402/v1/market-microstructure/${encodeURIComponent(symbol)}`,{query,contract:{service:"omni.hyperliquid_market_microstructure",schema:"hyperliquid_market_microstructure.v1",requiredCollection:"trades"}});
+  }
+
+  async marketInstruments(query:PublicMarketsQuery={}):Promise<PaidResult<PublicMarketCatalog>>{
+    validatePublicMarketsQuery(query);
+    const result=await this.request<PublicMarketCatalog>("GET","/api/x402/v1/markets",{query:{...query},contract:{service:"omni.public_market_catalog",requiredCollection:"rows"}});
+    if(result.data.schema!=="public_market_catalog.v1")throw new OmniContractError("Invalid public market catalog schema","/api/x402/v1/markets",undefined);
+    return result;
+  }
+
+  fundingHistory(symbol:PublicMarketSymbol,query:{lookback_hours?:number;limit?:number}={}):Promise<PaidResult<FundingHistory>>{
+    assertPublicMarketSymbol(symbol);assertOptionalInteger("lookback_hours",query.lookback_hours,1,168);assertOptionalInteger("limit",query.limit,1,168);
+    return this.request("GET",`/api/x402/v1/funding-history/${encodeURIComponent(symbol)}`,{query,contract:{service:"omni.hyperliquid_funding_history",schema:"hyperliquid_funding_history.v1",requiredCollection:"rows"}});
   }
 
   /** Purchase a bounded PNG. The returned receipt is seller metadata; reconcile it on-chain separately. */
@@ -440,6 +462,9 @@ export class OmniX402Client {
   liquidationBucketScreenshot(symbol: X402Symbol, query: LiquidationBucketScreenshotQuery): Promise<PaidResult<ScreenshotPng>> {
     assertSymbol(symbol);
     if (!query || !Number.isFinite(query.price) || query.price <= 0 || query.price > 1_000_000_000) throw new RangeError("price must be a positive finite number at most 1000000000");
+    for(const key of ["price_end","bucket_size"] as const)if(query[key]!==undefined&&(!Number.isFinite(query[key])||query[key]!<=0||query[key]!>1e9))throw new RangeError(`${key} must be positive and bounded`);
+    if(query.price_end!==undefined&&query.price_end<=query.price)throw new RangeError("price_end must exceed price");
+    if(query.price_end!==undefined&&query.bucket_size!==undefined&&Math.abs(query.price_end-query.price-query.bucket_size)>Math.max(1e-8,query.bucket_size*1e-10))throw new RangeError("bucket range must agree");
     assertOptionalOneOf("side", query.side, ["all", "buy", "sell"]);
     assertOptionalOneOf("scope", query.scope, ["current", "aggregate"]);
     return this.requestScreenshot(`/api/x402/v1/screenshots/liquidation-bucket/${symbol}`, { ...query });
@@ -476,6 +501,16 @@ const x402Symbols: readonly X402Symbol[] = ["BTC", "ETH", "SOL", "HYPE"];
 
 function assertSymbol(symbol: string): asserts symbol is X402Symbol {
   assertOneOf("symbol", symbol, x402Symbols);
+}
+
+export function assertPublicMarketSymbol(symbol:unknown):asserts symbol is PublicMarketSymbol{
+  if(typeof symbol!=="string" || !/^(?:[a-zA-Z0-9_-]{1,24}:)?[a-zA-Z0-9][a-zA-Z0-9._-]{0,39}$/.test(symbol))throw new RangeError("symbol must be a public perpetual subscription key, optionally dex:COIN");
+}
+export function validatePublicMarketsQuery(query:PublicMarketsQuery):void{
+  for(const key of Object.keys(query))if(!["limit","offset","search","dex","revision"].includes(key))throw new RangeError("unknown public market catalog query");
+  assertOptionalInteger("limit",query.limit,1,50);assertOptionalInteger("offset",query.offset,0,100000);assertOptionalInteger("revision",query.revision,0,Number.MAX_SAFE_INTEGER);
+  if(query.search!==undefined&&(typeof query.search!=="string"||query.search.length>40||/[\u0000-\u001f\u007f]/.test(query.search)))throw new RangeError("invalid market search");
+  if(query.dex!==undefined&&(typeof query.dex!=="string"||!/^[a-zA-Z0-9_-]{1,24}$/.test(query.dex)))throw new RangeError("invalid dex");
 }
 
 function assertIsoDate(name: string, value: unknown): asserts value is string {

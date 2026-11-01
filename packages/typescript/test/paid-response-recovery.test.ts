@@ -80,7 +80,7 @@ test("unsigned health parsing and rejected quote/admission remain unchanged", as
     assert.equal((error as Recovery).requiresReconciliation, undefined);
     return true;
   });
-  assert.throws(() => health.marketCarry("DOGE" as never), RangeError);
+  assert.throws(() => health.marketCarry("DOGE/../../private" as never), RangeError);
   assert.equal(calls, 1);
   const substituted = new OmniX402Client({ paymentClient: new x402Client(), fetch: async () => Response.json({}, { status: 402,
     headers: { "payment-required": encodePaymentRequiredHeader({ x402Version: 2, resource: { url: "https://other.invalid/paid" }, accepts: [] }) },

@@ -3,6 +3,53 @@ export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue
 export type JsonObject = { [key: string]: JsonValue };
 
 export type X402Symbol = "BTC" | "ETH" | "SOL" | "HYPE";
+/** Registry-validated perpetual subscription key, including qualified dex:COIN. */
+export type PublicMarketSymbol = string;
+export interface PublicMarketCatalog {
+  service:"omni.public_market_catalog";
+  schema:"public_market_catalog.v1";
+  product_version:"v1";
+  generated_at:string;
+  data_as_of:string|null;
+  freshness:Freshness;
+  snapshot_revision:number;
+  rows:Array<{canonical_symbol:string;subscription_key:string;symbol:string;venue:"hyperliquid";market_type:"perp";base:string;quote:string;dex:string;eligible_products:string[];availability_evaluated:false}>;
+  pagination:{offset:number;limit:number;total:number;next_offset:number|null};
+  scope:"current_hyperliquid_perpetual_identities";
+  private_contexts_included:false;
+}
+export interface PublicMarketsQuery {limit?:number;offset?:number;search?:string;dex?:string;revision?:number}
+
+export interface MarketMicrostructure {
+  service: "omni.hyperliquid_market_microstructure";
+  schema: "hyperliquid_market_microstructure.v1";
+  product_version: "v1";
+  symbol: string;
+  venue: "hyperliquid";
+  generated_at: string;
+  observed_through: string;
+  freshness: Freshness;
+  orderbook: { data_as_of: string; depth: number; bids: Array<{ price:number; size:number; order_count:number }>; asks: Array<{ price:number; size:number; order_count:number }>; spread:number; midpoint:number; depth_size_imbalance:number };
+  trades: Array<{ timestamp:number; price:number; size:number; aggressor_side:"buy"|"sell" }>;
+  trade_flow: { buy_notional_usd:number; sell_notional_usd:number; net_aggressor_notional_usd:number; window_seconds:number; sampled:true; complete_window:false; source_returned_count:number; returned_count:number };
+  provenance: Record<string,unknown>;
+}
+export interface FundingHistory {
+  service:"omni.hyperliquid_funding_history";
+  schema:"hyperliquid_funding_history.v1";
+  product_version:"v1";
+  symbol:string;
+  venue:"hyperliquid";
+  generated_at:string;
+  observed_through:string;
+  freshness:Freshness;
+  from_timestamp:number;
+  to_timestamp:number;
+  rows:Array<{timestamp:number;funding_rate:number;premium:number}>;
+  quality:{expected_interval_seconds:3600;gap_count:number;gap_count_basis:"interior_of_returned_rows_only";source_window_complete:false;expected_window_observations:number;source_returned_count:number;source_missing_leading_hours_estimate:number;source_missing_trailing_hours_estimate:number;missing_window_observations_estimate:number;actual_returned_from:number|null;actual_returned_to:number|null;truncated:boolean;empty:boolean};
+  semantics:{funding_rate_unit:"fraction_per_hour";historical_settled_rates:true;open_interest_history_included:false};
+  provenance:Record<string,unknown>;
+}
 
 export interface NewsAnalysisLineage {
   schema_version: string;
@@ -294,6 +341,8 @@ export interface TraderLeaderboard {
   data_as_of: string | number | null;
   freshness: Freshness;
   rows: Array<Record<string, unknown>>;
+  ranking?: { basis: string; order: "ascending" | "descending"; pnl_currency: "USD"; realized_pnl_included: false; historical_performance_included: false };
+  provenance?: { venue: "hyperliquid"; dataset: "public_position_snapshot"; population: string; observed_position_count: number | null; published_ranking_count: number; exhaustive_all_wallets: false };
   usage: Record<string, unknown>;
 }
 
@@ -316,6 +365,8 @@ export interface MarketSnapshot {
   interval: string;
   scope: "current" | "aggregate";
   generated_at: string;
+  observed_through?: string;
+  latest_candle_period_end?: string | null;
   data_as_of: string | null;
   freshness: Freshness;
   candles: MarketSnapshotCandle[];
@@ -329,6 +380,8 @@ export interface EntityResolutionItem {
   normalized_alias: string;
   resolution_status: "resolved" | "unsupported";
   canonical_symbol: string | null;
+  eligible_products?:string[];
+  availability_evaluated?:false;
   venue?: "hyperliquid";
   base?: string;
   quote?: string;
