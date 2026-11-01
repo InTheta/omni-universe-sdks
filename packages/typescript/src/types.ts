@@ -178,6 +178,7 @@ export interface X402Health {
   payment_enabled: boolean;
   bazaar_metadata?: boolean;
   discovery_catalog?: string;
+  readiness_scope?: "payment_transport";
 }
 
 export interface X402AnalysisLineage {
@@ -189,19 +190,26 @@ export interface X402AnalysisLineage {
 
 export interface X402NewsItem {
   id: string;
-  timestamp: number;
+  timestamp: number | null;
   headline: string;
   summary: string;
   direction: string;
-  sentiment: number;
+  sentiment: number | null;
   impact: string;
-  importance: number;
-  confidence: number;
+  importance: number | null;
+  confidence: number | null;
+  impact_basis?: "unknown" | "source_importance_1_10_and_financial_event_evidence";
+  lineage?: X402PublicNewsLineage;
   tickers: string[];
   topics: string[];
   theme: string;
   analysis_type: string;
   analysis: X402AnalysisLineage;
+}
+
+export interface X402PublicNewsLineage {
+  event_id:string;content_hash:string;source_revision:string|null;source_event_at:string|null;
+  generated_at:string|null;ingested_at:string|null;schema_version:string|null;
 }
 
 export interface X402ContextEvent {
@@ -216,12 +224,15 @@ export interface X402ContextEvent {
 export interface X402MarketContext {
   object: "market_context.v1";
   generated_at: string;
-  cadence_minutes: 15;
+  cadence_minutes: number;
+  source_data_as_of?:string|null;
+  source_coverage?:{oldest_event_at:string|null;newest_event_at:string|null;known_count:number|null;unknown_count:number|null};
+  lineage?:X402PublicNewsLineage;
   source_window_hours: number | null;
   summary: string;
   direction: string;
-  sentiment_rating: number;
-  confidence: number;
+  sentiment_rating: number | null;
+  confidence: number | null;
   notable_tickers: string[];
   topics: string[];
   timeline: X402ContextEvent[];
@@ -234,8 +245,9 @@ export interface NewsPulse {
   symbol?: string;
   market: string;
   generated_at: string;
-  data_as_of: string;
-  freshness: Freshness;
+  data_as_of: string | null;
+  freshness: Freshness & {components?:{events:Freshness;context:Freshness|null;ingestion:Freshness};observed_through?:string;latest_event_at?:string|null;latest_event_age_seconds?:number|null;quiet_window?:boolean};
+  availability?:{events:"available"|"unavailable";context:"available"|"unavailable"|"not_requested"};
   market_context: X402MarketContext | null;
   items: X402NewsItem[];
   usage: {
@@ -287,7 +299,12 @@ export interface TraderProfile {
   positions: TraderPosition[];
   spot_balances: TraderSpotBalance[];
   activity: ScalarMap;
-  quality: { degraded_sources?: string[]; portfolio_history_used?: JsonPrimitive };
+  quality: {
+    degraded_sources?: string[]; portfolio_history_used?: JsonPrimitive;
+    valuation_complete?:boolean;valuation_status?:"complete"|"partial"|"unavailable";missing_valuation_fields?:string[];
+    positions?:{source_returned_count:number;returned_count:number;omitted_by_view:boolean;truncated_by_limit:boolean;source_collection_complete:false};
+    spot_balances?:{source_returned_count:number;returned_count:number;omitted_by_view:boolean;truncated_by_limit:boolean;source_collection_complete:false};
+  };
   usage: { position_count: number; spot_balance_count: number };
 }
 
