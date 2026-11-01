@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -69,6 +69,9 @@ try {
   mkdirSync(consumer);
   writeFileSync(join(consumer, "package.json"), JSON.stringify({ private: true, type: "module" }));
   run(npm, ["install", "--ignore-scripts", "--no-audit", "--no-fund", tarball], consumer);
+  // Optional brokerage authentication must never be forced into public data installs.
+  assert.equal(existsSync(join(consumer,"node_modules","@coinbase","cdp-sdk")), false, "data-only package installed optional custody SDK");
+  run(npm, ["audit", "--omit=dev"], consumer);
 
   // The consumer installs ONLY the packed SDK. Declaration dependencies must
   // arrive transitively; repository devDependencies cannot mask broken types.
@@ -137,6 +140,11 @@ try {
     }
     if (typeof brokers.CoinbaseAdvancedTradeClient !== "function") throw new Error("missing Coinbase broker export");
     if (typeof brokers.RobinhoodCryptoClient !== "function") throw new Error("missing Robinhood broker export");
+    let requests = 0;
+    const broker = new brokers.CoinbaseAdvancedTradeClient({apiKey:"fixture",apiSecret:"fixture",fetch:async()=>{requests++;throw new Error("must not fetch");}});
+    try { await broker.request("GET", "/fixture"); throw new Error("missing optional broker dependency was accepted"); }
+    catch(error) { if(!String(error).includes("optional @coinbase/cdp-sdk peer dependency")) throw error; }
+    if(requests !== 0) throw new Error("missing optional dependency reached broker network");
   `;
   run(process.execPath, ["--input-type=module", "--eval", smokeTest], consumer);
   const installedRoot = join(consumer, "node_modules", "@omni-terminal", "sdk");

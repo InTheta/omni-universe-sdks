@@ -15,6 +15,12 @@ flow is explicitly sampled and cannot establish complete interval volume. Fundin
 its actual returned range, interior gaps and estimated missing boundary hours; a fresh last row
 does not establish a complete historical window. No historical OI is implied.
 
+`l4BookSnapshot(symbol, { orders_per_side })` returns a bounded atomic book, exact maker addresses
+and string order IDs. `realizedLiquidations(symbol, { scope, windows })` returns sampled lower-bound
+windows (`1m`, `5m`, `15m`, `1h`), actual event bounds and source watermark semantics. Their MCP
+counterparts are `l4BookSnapshotData` and `realizedLiquidationsData`. The seller rejects an older,
+unqualified liquidation source contract rather than labeling its windows complete.
+
 MCP adds direct profile, leaderboard, liquidation map and market snapshot JSON recipes. Use
 `screenshotData(toolName, args)` for the three native image tools. The client requires a successful
 settlement, bounded PNG bytes and metadata matching the exact product. A valid PNG is not proof
@@ -28,3 +34,16 @@ performance. Full public addresses are preserved.
 Direct commodity Hyperliquid reads remain in the existing direct public API client. Paid recipes
 add bounded normalization, quality checks, derived flow or coverage semantics rather than replacing
 that direct API boundary. This source change neither authorizes spending nor changes payer policy.
+
+## Optional broker authentication and security qualification
+
+Public data consumers do not install Coinbase's custody SDK. The separate `@omni-terminal/sdk/brokers`
+entry remains importable, including Robinhood, without it. Coinbase requests require an explicitly
+installed optional peer, `@coinbase/cdp-sdk@^1.60.0`; a missing peer fails before any broker request.
+Development tests retain the peer so broker behavior is exercised.
+
+The Coinbase peer remains **unqualified for release security**: its latest dependency tree retains
+upstream Zod 3/abitype advisories. Making it optional does not repair those dependencies or qualify
+Coinbase trading. The packed public-data-only consumer is independently audited; package development
+audits must still disclose the optional broker dependency findings. No custody or trading acceptance
+is implied by public-data verification.

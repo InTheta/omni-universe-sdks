@@ -62,20 +62,21 @@
     "node": ">=22.12"
   },
   "dependencies": {
-    "@coinbase/cdp-sdk": "1.46.0",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@nktkas/hyperliquid": "0.33.3",
     "@types/node": "^24.3.0",
     "@types/ws": "^8.18.1",
-    "@x402/core": "^2.20.0",
-    "@x402/evm": "^2.20.0",
-    "@x402/fetch": "^2.20.0",
-    "@x402/mcp": "^2.20.0",
+    "@x402/core": "^2.29.0",
+    "@x402/evm": "^2.29.0",
+    "@x402/fetch": "^2.29.0",
+    "@x402/mcp": "^2.29.0",
     "tweetnacl": "^1.0.3",
     "viem": "^2.37.13",
-    "ws": "^8.21.2"
+    "ws": "^8.21.2",
+    "zod": "4.6.7"
   },
   "devDependencies": {
+    "@coinbase/cdp-sdk": "1.60.0",
     "tsx": "^4.23.5",
     "typescript": "^7.0.2"
   },
@@ -88,5 +89,13 @@
     "market-data"
   ],
   "license": "MIT",
-  "sideEffects": false
+  "sideEffects": false,
+  "peerDependencies": {
+    "@coinbase/cdp-sdk": "^1.60.0"
+  },
+  "peerDependenciesMeta": {
+    "@coinbase/cdp-sdk": {
+      "optional": true
+    }
+  }
 }
