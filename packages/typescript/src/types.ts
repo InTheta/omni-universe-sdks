@@ -50,6 +50,19 @@ export interface FundingHistory {
   semantics:{funding_rate_unit:"fraction_per_hour";historical_settled_rates:true;open_interest_history_included:false};
   provenance:Record<string,unknown>;
 }
+export type LiquidationWindow="1m"|"5m"|"15m"|"1h";
+export interface L4BookSnapshot {
+  service:"omni.hyperliquid_l4_snapshot";schema:"hyperliquid_l4_snapshot.v1";product_version:"v1";symbol:string;venue:"hyperliquid";generated_at:string;data_as_of:string;freshness:Freshness;snapshot_block_height:string;
+  bids:Array<{order_id:string;maker_address:string;price:number;size:number;notional_usd:number;created_at:string}>;
+  asks:L4BookSnapshot["bids"];
+  quality:{atomic_snapshot:true;complete_book:false;orders_per_side_limit:number;returned_bid_orders:number;returned_ask_orders:number;incremental_continuity_asserted:false};
+  provenance:Record<string,unknown>;
+}
+export interface RealizedLiquidations {
+  service:"omni.hyperliquid_realized_liquidations";schema:"hyperliquid_realized_liquidations.v1";product_version:"v1";symbol:string;scope:"current"|"aggregate";venue:"hyperliquid";generated_at:string;data_as_of:string;observed_through:string;freshness:Freshness;latest_liquidation_event_at:string|null;quiet_window:boolean;
+  windows:Array<{window_seconds:number;from_timestamp:number;to_timestamp:number;observed_fill_count:number;total_notional_usd:number;buy_notional_usd:number;sell_notional_usd:number;largest_notional_usd:number;oldest_event_at:string|null;newest_event_at:string|null;coverage:{sampled:true;complete_window:false;tail_truncated:boolean;source_returned_rows:number;lower_bound:true}}>;
+  quality:{sampled:true;complete_window:false;duplicate_rows_removed:number;ingestion_watermark_source:"global_public_fills_stream"};provenance:Record<string,unknown>;
+}
 
 export interface NewsAnalysisLineage {
   schema_version: string;

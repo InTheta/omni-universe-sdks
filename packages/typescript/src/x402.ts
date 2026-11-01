@@ -16,6 +16,9 @@ import type {
   PublicMarketSymbol,
   PublicMarketCatalog,
   PublicMarketsQuery,
+  L4BookSnapshot,
+  RealizedLiquidations,
+  LiquidationWindow,
   NewsPulse,
   PaidResult,
   PaymentReceipt,
@@ -391,6 +394,14 @@ export class OmniX402Client {
     assertPublicMarketSymbol(symbol);assertOptionalInteger("lookback_hours",query.lookback_hours,1,168);assertOptionalInteger("limit",query.limit,1,168);
     return this.request("GET",`/api/x402/v1/funding-history/${encodeURIComponent(symbol)}`,{query,contract:{service:"omni.hyperliquid_funding_history",schema:"hyperliquid_funding_history.v1",requiredCollection:"rows"}});
   }
+  l4BookSnapshot(symbol:PublicMarketSymbol,query:{orders_per_side?:number}={}):Promise<PaidResult<L4BookSnapshot>>{
+    assertPublicMarketSymbol(symbol);assertOptionalInteger("orders_per_side",query.orders_per_side,1,50);
+    return this.request("GET",`/api/x402/v1/orderbook-l4/${encodeURIComponent(symbol)}`,{query,contract:{service:"omni.hyperliquid_l4_snapshot",schema:"hyperliquid_l4_snapshot.v1",requiredCollection:"bids"}});
+  }
+  realizedLiquidations(symbol:PublicMarketSymbol,query:{scope?:"current"|"aggregate";windows?:readonly LiquidationWindow[]}={}):Promise<PaidResult<RealizedLiquidations>>{
+    assertPublicMarketSymbol(symbol);assertOptionalOneOf("scope",query.scope,["current","aggregate"]);validateLiquidationWindows(query.windows);
+    return this.request("GET",`/api/x402/v1/liquidation-bursts/${encodeURIComponent(symbol)}`,{query:{scope:query.scope,windows:query.windows?.join(",")},contract:{service:"omni.hyperliquid_realized_liquidations",schema:"hyperliquid_realized_liquidations.v1",requiredCollection:"windows"}});
+  }
 
   /** Purchase a bounded PNG. The returned receipt is seller metadata; reconcile it on-chain separately. */
   private async requestScreenshot(path: string, query: Record<string, QueryValue>): Promise<PaidResult<ScreenshotPng>> {
@@ -511,6 +522,10 @@ export function validatePublicMarketsQuery(query:PublicMarketsQuery):void{
   assertOptionalInteger("limit",query.limit,1,50);assertOptionalInteger("offset",query.offset,0,100000);assertOptionalInteger("revision",query.revision,0,Number.MAX_SAFE_INTEGER);
   if(query.search!==undefined&&(typeof query.search!=="string"||query.search.length>40||/[\u0000-\u001f\u007f]/.test(query.search)))throw new RangeError("invalid market search");
   if(query.dex!==undefined&&(typeof query.dex!=="string"||!/^[a-zA-Z0-9_-]{1,24}$/.test(query.dex)))throw new RangeError("invalid dex");
+}
+export function validateLiquidationWindows(windows:unknown):void{
+  if(windows===undefined)return;
+  if(!Array.isArray(windows)||windows.length<1||windows.length>4||new Set(windows).size!==windows.length||windows.some(v=>!["1m","5m","15m","1h"].includes(String(v))))throw new RangeError("windows must contain one to four unique supported windows");
 }
 
 function assertIsoDate(name: string, value: unknown): asserts value is string {

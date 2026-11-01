@@ -4,8 +4,8 @@ import { x402Client } from "@x402/core/client";
 import { wrapMCPClientWithPayment, type PaymentRequestedContext, type SettleResponse, type x402MCPClient, type x402MCPToolCallResult } from "@x402/mcp";
 import { OmniContractError } from "./errors.js";
 import type { EntityResolution, MarketCarry, MarketRisk, NewsPulse, PremarketRoundup, PremarketRoundupQuery, TraderLeaderboard, TraderProfile, LiquidationMap, MarketSnapshot, MarketMicrostructure, FundingHistory } from "./types.js";
-import { createEvmPaymentClient, DEFAULT_MAX_X402_PAYMENT_USD, validatePaymentSettlement, assertPublicMarketSymbol, validatePublicMarketsQuery, type ScreenshotPng } from "./x402.js";
-import type { PublicMarketCatalog, PublicMarketsQuery } from "./types.js";
+import { createEvmPaymentClient, DEFAULT_MAX_X402_PAYMENT_USD, validatePaymentSettlement, assertPublicMarketSymbol, validatePublicMarketsQuery, validateLiquidationWindows, type ScreenshotPng } from "./x402.js";
+import type { PublicMarketCatalog, PublicMarketsQuery, L4BookSnapshot, RealizedLiquidations, LiquidationWindow } from "./types.js";
 
 export type OmniMcpToolName =
   | "get_market_catalog"
@@ -17,7 +17,7 @@ export type OmniMcpToolName =
   | "get_premarket_roundup"
   | PublicJsonMcpToolName
   | ScreenshotMcpToolName;
-export type PublicJsonMcpToolName="get_trader_leaderboard"|"get_trader_profile"|"get_liquidation_map"|"get_market_snapshot"|"get_market_microstructure"|"get_funding_history";
+export type PublicJsonMcpToolName="get_trader_leaderboard"|"get_trader_profile"|"get_liquidation_map"|"get_market_snapshot"|"get_market_microstructure"|"get_funding_history"|"get_l4_orderbook"|"get_realized_liquidations";
 export type ScreenshotMcpToolName="get_liquidation_levels_screenshot"|"get_liquidation_bucket_screenshot"|"get_trader_profile_screenshot";
 export type PublicMcpToolName=OmniMcpToolName|PublicJsonMcpToolName|ScreenshotMcpToolName;
 
@@ -193,6 +193,8 @@ export class OmniMcpClient {
   marketSnapshotData(symbol:string,query:Record<string,unknown>={}):Promise<OmniMcpDataResult<MarketSnapshot>>{return this.callJsonTool("get_market_snapshot",{...query,symbol});}
   marketMicrostructureData(symbol:string,query:{depth?:number;trade_limit?:number;trade_window_seconds?:number}={}):Promise<OmniMcpDataResult<MarketMicrostructure>>{return this.callJsonTool("get_market_microstructure",{...query,symbol});}
   fundingHistoryData(symbol:string,query:{lookback_hours?:number;limit?:number}={}):Promise<OmniMcpDataResult<FundingHistory>>{return this.callJsonTool("get_funding_history",{...query,symbol});}
+  l4BookSnapshotData(symbol:string,query:{orders_per_side?:number}={}):Promise<OmniMcpDataResult<L4BookSnapshot>>{return this.callJsonTool("get_l4_orderbook",{...query,symbol});}
+  realizedLiquidationsData(symbol:string,query:{scope?:"current"|"aggregate";windows?:readonly LiquidationWindow[]}={}):Promise<OmniMcpDataResult<RealizedLiquidations>>{return this.callJsonTool("get_realized_liquidations",{...query,symbol});}
   async screenshotData(name:ScreenshotMcpToolName,args:Record<string,unknown>,options:{signal?:AbortSignal}={}):Promise<OmniMcpDataResult<ScreenshotPng>>{return parseMcpScreenshot(name,await this.callTool(name,args,options));}
 
   async close(): Promise<void> {
@@ -209,6 +211,8 @@ const mcpToolContracts: Record<OmniMcpToolName, { service: string; schema?: stri
   get_market_snapshot:{service:"omni.hyperliquid_market_snapshot",schema:"hyperliquid_market_snapshot.v1",requiredCollection:"candles"},
   get_market_microstructure:{service:"omni.hyperliquid_market_microstructure",schema:"hyperliquid_market_microstructure.v1",requiredCollection:"trades"},
   get_funding_history:{service:"omni.hyperliquid_funding_history",schema:"hyperliquid_funding_history.v1",requiredCollection:"rows"},
+  get_l4_orderbook:{service:"omni.hyperliquid_l4_snapshot",schema:"hyperliquid_l4_snapshot.v1",requiredCollection:"bids"},
+  get_realized_liquidations:{service:"omni.hyperliquid_realized_liquidations",schema:"hyperliquid_realized_liquidations.v1",requiredCollection:"windows"},
   get_liquidation_levels_screenshot:{service:"omni.liquidation_levels_screenshot",schema:"omni_screenshot.v1"},
   get_liquidation_bucket_screenshot:{service:"omni.liquidation_bucket_screenshot",schema:"omni_screenshot.v1"},
   get_trader_profile_screenshot:{service:"omni.trader_profile_screenshot",schema:"omni_screenshot.v1"},
@@ -356,7 +360,7 @@ export function validateMcpToolArguments(
 function validatePublicMcpArguments(name:PublicJsonMcpToolName|ScreenshotMcpToolName,input:Record<string,unknown>){
   if(input.symbol!==undefined)input={...input,symbol:normalizeString("symbol",input.symbol,1,80)};
   const fields:Record<PublicJsonMcpToolName|ScreenshotMcpToolName,string[]>={
-    get_trader_leaderboard:["symbol","scope","rank","limit"],get_trader_profile:["address","range","view","symbol","limit"],get_liquidation_map:["symbol","scope","view","limit","order","around_price","side"],get_market_snapshot:["symbol","scope","interval","limit","include_liquidations"],get_market_microstructure:["symbol","depth","trade_limit","trade_window_seconds"],get_funding_history:["symbol","lookback_hours","limit"],get_liquidation_levels_screenshot:["symbol","interval","scope","layout"],get_liquidation_bucket_screenshot:["symbol","price","price_end","bucket_size","side","scope"],get_trader_profile_screenshot:["address","symbol","range","tab","mode"],
+    get_trader_leaderboard:["symbol","scope","rank","limit"],get_trader_profile:["address","range","view","symbol","limit"],get_liquidation_map:["symbol","scope","view","limit","order","around_price","side"],get_market_snapshot:["symbol","scope","interval","limit","include_liquidations"],get_market_microstructure:["symbol","depth","trade_limit","trade_window_seconds"],get_funding_history:["symbol","lookback_hours","limit"],get_l4_orderbook:["symbol","orders_per_side"],get_realized_liquidations:["symbol","scope","windows"],get_liquidation_levels_screenshot:["symbol","interval","scope","layout"],get_liquidation_bucket_screenshot:["symbol","price","price_end","bucket_size","side","scope"],get_trader_profile_screenshot:["address","symbol","range","tab","mode"],
   };
   assertOnlyKeys(name,input,fields[name]);
   const profile=name==="get_trader_profile"||name==="get_trader_profile_screenshot";
@@ -375,6 +379,7 @@ function validatePublicMcpArguments(name:PublicJsonMcpToolName|ScreenshotMcpTool
   if(input.side!==undefined)assertOptionalOneOf("side",input.side,name.endsWith("screenshot")?["all","buy","sell"]:["all","long","short"]);
   assertOptionalInteger("limit",input.limit,name==="get_market_snapshot"?20:1,name==="get_market_snapshot"?200:name==="get_funding_history"?168:name==="get_liquidation_map"?50:20);
   assertOptionalInteger("depth",input.depth,1,50);assertOptionalInteger("trade_limit",input.trade_limit,1,100);assertOptionalInteger("trade_window_seconds",input.trade_window_seconds,1,3600);assertOptionalInteger("lookback_hours",input.lookback_hours,1,168);
+  assertOptionalInteger("orders_per_side",input.orders_per_side,1,50);validateLiquidationWindows(input.windows);
   for(const key of ["price","price_end","bucket_size","around_price"])if(input[key]!==undefined&&(typeof input[key]!=="number"||!Number.isFinite(input[key])||Number(input[key])<=0||Number(input[key])>1e9))throw new RangeError(`${key} must be positive and bounded`);
   if(name==="get_liquidation_bucket_screenshot"){if(input.price===undefined)throw new RangeError("price is required");if(input.price_end!==undefined&&Number(input.price_end)<=Number(input.price))throw new RangeError("price_end must exceed price");if(input.price_end!==undefined&&input.bucket_size!==undefined&&Math.abs(Number(input.price_end)-Number(input.price)-Number(input.bucket_size))>Math.max(1e-8,Number(input.bucket_size)*1e-10))throw new RangeError("bucket range must agree");}
   if(input.include_liquidations!==undefined&&typeof input.include_liquidations!=="boolean")throw new RangeError("include_liquidations must be boolean");

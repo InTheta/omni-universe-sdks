@@ -42,3 +42,21 @@ test("public instrument discovery uses the unsigned transport and never accepts 
   assert.throws(()=>validateMcpToolArguments("list_market_instruments",{limit:51}));
   assert.throws(()=>validateMcpToolResult("list_market_instruments",{content:[{type:"text",text:"{}"}],paymentMade:true,paymentResponse:receipt}),OmniContractError);
 });
+
+test("orderflow recipes preserve exact namespace and reject unbounded or ambiguous windows",async()=>{
+  const seen:URL[]=[];
+  const client=new OmniX402Client({paymentClient:new x402Client(),fetch:async(input)=>{
+    const u=new URL(input instanceof Request?input.url:String(input));seen.push(u);
+    const l4=u.pathname.includes("orderbook-l4");
+    return Response.json({service:l4?"omni.hyperliquid_l4_snapshot":"omni.hyperliquid_realized_liquidations",schema:l4?"hyperliquid_l4_snapshot.v1":"hyperliquid_realized_liquidations.v1",...(l4?{bids:[]}:{windows:[]})},{headers:{"payment-response":encodePaymentResponseHeader(receipt)}});
+  }});
+  await client.l4BookSnapshot("xyz:SPCX",{orders_per_side:50});
+  await client.realizedLiquidations("xyz:SPCX",{scope:"aggregate",windows:["1m","1h"]});
+  assert.equal(seen[0]?.pathname,"/api/x402/v1/orderbook-l4/xyz%3ASPCX");assert.equal(seen[0]?.searchParams.get("orders_per_side"),"50");
+  assert.equal(seen[1]?.searchParams.get("windows"),"1m,1h");
+  assert.throws(()=>client.l4BookSnapshot("BTC",{orders_per_side:51}));
+  assert.throws(()=>client.realizedLiquidations("BTC",{windows:["1m","1m"]}));
+  assert.throws(()=>validateMcpToolArguments("get_l4_orderbook",{symbol:"BTC",orders_per_side:51}));
+  assert.throws(()=>validateMcpToolArguments("get_realized_liquidations",{symbol:"BTC",windows:["24h"]}));
+  assert.deepEqual(validateMcpToolArguments("get_realized_liquidations",{symbol:"xyz:SPCX",windows:["1m","1h"]}),{symbol:"xyz:SPCX",windows:["1m","1h"]});
+});
