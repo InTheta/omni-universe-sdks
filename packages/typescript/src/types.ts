@@ -271,7 +271,11 @@ export interface NewsPulse {
   market: string;
   generated_at: string;
   data_as_of: string | null;
-  freshness: Freshness & {components?:{events:Freshness;context:Freshness|null;ingestion:Freshness};observed_through?:string;latest_event_at?:string|null;latest_event_age_seconds?:number|null;quiet_window?:boolean};
+  freshness: Freshness & {
+    components?:{events:Freshness;context:Freshness|null;ingestion:Freshness};observed_through?:string|null;
+    latest_event_at?:string|null;latest_event_age_seconds?:number|null;quiet_window?:boolean;
+    complete_window?:"unknown";analysis_catch_up?:"unknown";analysis_progress?:{persisted_at:string|null;source_event_at:string|null};
+  };
   availability?:{events:"available"|"unavailable";context:"available"|"unavailable"|"not_requested"};
   market_context: X402MarketContext | null;
   items: X402NewsItem[];
