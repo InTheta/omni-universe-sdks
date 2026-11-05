@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -69,6 +69,9 @@ try {
   mkdirSync(consumer);
   writeFileSync(join(consumer, "package.json"), JSON.stringify({ private: true, type: "module" }));
   run(npm, ["install", "--ignore-scripts", "--no-audit", "--no-fund", tarball], consumer);
+  // Optional brokerage authentication must never be forced into public data installs.
+  assert.equal(existsSync(join(consumer,"node_modules","@coinbase","cdp-sdk")), false, "data-only package installed optional custody SDK");
+  run(npm, ["audit", "--omit=dev"], consumer);
 
   // The consumer installs ONLY the packed SDK. Declaration dependencies must
   // arrive transitively; repository devDependencies cannot mask broken types.
@@ -137,6 +140,11 @@ try {
     }
     if (typeof brokers.CoinbaseAdvancedTradeClient !== "function") throw new Error("missing Coinbase broker export");
     if (typeof brokers.RobinhoodCryptoClient !== "function") throw new Error("missing Robinhood broker export");
+    let requests = 0;
+    const broker = new brokers.CoinbaseAdvancedTradeClient({apiKey:"fixture",apiSecret:"fixture",fetch:async()=>{requests++;throw new Error("must not fetch");}});
+    try { await broker.request("GET", "/fixture"); throw new Error("missing optional broker dependency was accepted"); }
+    catch(error) { if(!String(error).includes("optional @coinbase/cdp-sdk peer dependency")) throw error; }
+    if(requests !== 0) throw new Error("missing optional dependency reached broker network");
   `;
   run(process.execPath, ["--input-type=module", "--eval", smokeTest], consumer);
   const installedRoot = join(consumer, "node_modules", "@omni-terminal", "sdk");
@@ -161,6 +169,40 @@ try {
     assert.doesNotMatch(probe.stderr, /ERR_MODULE_NOT_FOUND|Cannot find package/);
   }
   console.log("Packed compiled examples run without tsx or consumer devDependencies; recovery fixtures and missing-scope guard passed");
+  const brokerConsumer=join(temporaryRoot,"broker-consumer");mkdirSync(brokerConsumer);
+  writeFileSync(join(brokerConsumer,"package.json"),JSON.stringify({private:true,type:"module",overrides:{zod:"4.6.7",abitype:"1.3.0"}}));
+  run(npm,["install","--ignore-scripts","--no-audit","--no-fund",tarball,"@coinbase/cdp-sdk@1.60.0"],brokerConsumer);
+  const brokerRoot=join(brokerConsumer,"node_modules/@omni-terminal/sdk");
+  const unqualified=`
+    import {CoinbaseAdvancedTradeClient} from '@omni-terminal/sdk/brokers';
+    let fetched=0;
+    const client=new CoinbaseAdvancedTradeClient({apiKey:'fixture',apiSecret:'fixture',fetch:async()=>{fetched++;throw new Error('network forbidden');}});
+    try{await client.request('GET','/fixture');throw new Error('unqualified dependency accepted');}
+    catch(e){if(!String(e).includes('not security-qualified'))throw e;}
+    if(fetched)throw new Error('unqualified dependency reached network');
+  `;
+  run(process.execPath,["--input-type=module","--eval",unqualified],brokerConsumer);
+  run(process.execPath,[join(brokerRoot,"docs/migrate-coinbase-schemas.cjs"),"--root",brokerConsumer],brokerConsumer);
+  run(process.execPath,[join(brokerRoot,"docs/migrate-coinbase-schemas.cjs"),"--root",brokerConsumer,"--check"],brokerConsumer);
+  run(process.execPath,["--test",join(brokerRoot,"docs/test-coinbase-schemas.node.mjs")],brokerConsumer);
+  run(npm,["audit"],brokerConsumer);
+  const qualified=`
+    import assert from 'node:assert/strict';
+    import {generateKeyPairSync} from 'node:crypto';
+    import {jwtVerify} from 'jose';
+    import {CoinbaseAdvancedTradeClient} from '@omni-terminal/sdk/brokers';
+    const keys=generateKeyPairSync('ec',{namedCurve:'prime256v1'});
+    let fetched=0;
+    const client=new CoinbaseAdvancedTradeClient({apiKey:'fixture',apiSecret:keys.privateKey.export({type:'pkcs8',format:'pem'}),fetch:async(_url,init)=>{
+      fetched++;const token=new Headers(init.headers).get('authorization').slice(7);
+      const {payload}=await jwtVerify(token,keys.publicKey,{algorithms:['ES256'],issuer:'cdp',subject:'fixture'});
+      assert.deepEqual(payload.uris,['GET api.coinbase.com/fixture']);
+      return Response.json({ok:true});
+    }});
+    assert.equal((await client.request('GET','/fixture')).ok,true);assert.equal(fetched,1);
+  `;
+  run(process.execPath,["--input-type=module","--eval",qualified],brokerConsumer);
+  console.log("Packed optional Coinbase consumer: unqualified-peer network guard, guarded migration, schema/JWT tests, verified SDK mock request and audit zero passed");
   console.log(`Package consumer smoke passed: ${packed.name}@${packed.version} (${paths.length} files)`);
 } finally {
   rmSync(temporaryRoot, { recursive: true, force: true });

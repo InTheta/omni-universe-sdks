@@ -3,6 +3,91 @@ export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue
 export type JsonObject = { [key: string]: JsonValue };
 
 export type X402Symbol = "BTC" | "ETH" | "SOL" | "HYPE";
+/** Registry-validated perpetual subscription key, including qualified dex:COIN. */
+export type PublicMarketSymbol = string;
+export interface PublicMarketCatalog {
+  service:"omni.public_market_catalog";
+  schema:"public_market_catalog.v1";
+  product_version:"v1";
+  generated_at:string;
+  data_as_of:string|null;
+  freshness:Freshness;
+  snapshot_revision:number;
+  rows:Array<{canonical_symbol:string;subscription_key:string;symbol:string;venue:"hyperliquid";market_type:"perp";base:string;quote:string;dex:string;eligible_products:string[];availability_evaluated:false}>;
+  pagination:{offset:number;limit:number;total:number;next_offset:number|null};
+  scope:"current_hyperliquid_perpetual_identities";
+  private_contexts_included:false;
+}
+export interface PublicMarketsQuery {limit?:number;offset?:number;search?:string;dex?:string;revision?:number}
+
+export interface MarketMicrostructure {
+  service: "omni.hyperliquid_market_microstructure";
+  schema: "hyperliquid_market_microstructure.v1";
+  product_version: "v1";
+  symbol: string;
+  venue: "hyperliquid";
+  generated_at: string;
+  observed_through: string;
+  freshness: Freshness;
+  orderbook: { data_as_of: string; depth: number; bids: Array<{ price:number; size:number; order_count:number }>; asks: Array<{ price:number; size:number; order_count:number }>; spread:number; midpoint:number; depth_size_imbalance:number };
+  trades: Array<{ timestamp:number; price:number; size:number; aggressor_side:"buy"|"sell" }>;
+  trade_flow: { buy_notional_usd:number; sell_notional_usd:number; net_aggressor_notional_usd:number; window_seconds:number; sampled:true; complete_window:false; source_returned_count:number; returned_count:number };
+  provenance: Record<string,unknown>;
+}
+export interface FundingHistory {
+  service:"omni.hyperliquid_funding_history";
+  schema:"hyperliquid_funding_history.v1";
+  product_version:"v1";
+  symbol:string;
+  venue:"hyperliquid";
+  generated_at:string;
+  observed_through:string;
+  freshness:Freshness;
+  from_timestamp:number;
+  to_timestamp:number;
+  rows:Array<{timestamp:number;funding_rate:number;premium:number}>;
+  quality:{expected_interval_seconds:3600;gap_count:number;gap_count_basis:"interior_of_returned_rows_only";source_window_complete:false;expected_window_observations:number;source_returned_count:number;source_missing_leading_hours_estimate:number;source_missing_trailing_hours_estimate:number;missing_window_observations_estimate:number;actual_returned_from:number|null;actual_returned_to:number|null;truncated:boolean;empty:boolean};
+  semantics:{funding_rate_unit:"fraction_per_hour";historical_settled_rates:true;open_interest_history_included:false};
+  provenance:Record<string,unknown>;
+}
+export type LiquidationWindow="1m"|"5m"|"15m"|"1h";
+export type SpotCandleInterval="1m"|"5m"|"15m"|"1h"|"4h"|"1d";
+export interface SpotTokenIdentity {index:number;token_id:string;name:string;size_decimals:number;is_canonical:boolean}
+export interface SpotMarketIdentity {market_id:string;market_type:"spot";pair_index:number;source_coin:string;base:SpotTokenIdentity;quote:SpotTokenIdentity;is_canonical_pair:boolean}
+export interface PublicSpotMarketsQuery {limit?:number;offset?:number;revision?:string}
+export interface PublicSpotMarketCatalog {
+  service:"omni.public_spot_market_catalog";schema:"public_spot_market_catalog.v1";product_version:"v1";
+  observed_at:string;metadata_revision:string;freshness:Freshness;source_timestamp_available:false;
+  rows:Array<SpotMarketIdentity&{eligible_products:string[];availability_evaluated:false}>;
+  pagination:{offset:number;limit:number;total:number;next_offset:number|null};private_contexts_included:false;
+}
+export interface SpotMarketQuote {
+  service:"omni.hyperliquid_spot_quote";schema:"hyperliquid_spot_quote.v1";product_version:"v1";market:SpotMarketIdentity;
+  generated_at:string;data_as_of:string;freshness:Freshness;
+  quote:{best_bid:number;best_ask:number;midpoint:number;spread:number;price_unit:"quote_token"};
+  depth:{limit:number;bids:Array<{price:number;size:number;order_count:number}>;asks:Array<{price:number;size:number;order_count:number}>;complete_book:false};
+  context:{mark_price:number;previous_day_price:number;day_notional_volume_in_quote:number;day_base_volume:number|null;exchange_timestamp:null;observation_received_at:string;freshness_status:"unknown"};
+  quality:Record<string,unknown>;provenance:Record<string,unknown>;
+}
+export interface SpotCandles {
+  service:"omni.hyperliquid_spot_candles";schema:"hyperliquid_spot_candles.v1";product_version:"v1";market:SpotMarketIdentity;interval:SpotCandleInterval;
+  generated_at:string;source_snapshot_observed_at:string;data_as_of:string|null;freshness:Freshness;from_timestamp:number;to_timestamp:number;
+  candles:Array<{open_time:number;close_time:number;open:number;high:number;low:number;close:number;volume:number;trades:number;period_complete:boolean}>;
+  quality:{source_returned_count:number;returned_count:number;truncated:boolean;empty:boolean;source_window_complete:false;interior_gap_count:number;requested_interval_count:number;missing_observations_estimate:number;freshness_basis:"latest_completed_candle_period_end";current_period_included:boolean;last_mutation_timestamp_available:false};
+  semantics:{price_unit:"quote_token";volume_unit:"base_token";open_period_may_change:true};provenance:Record<string,unknown>;
+}
+export interface L4BookSnapshot {
+  service:"omni.hyperliquid_l4_snapshot";schema:"hyperliquid_l4_snapshot.v1";product_version:"v1";symbol:string;venue:"hyperliquid";generated_at:string;data_as_of:string;freshness:Freshness;snapshot_block_height:string;
+  bids:Array<{order_id:string;maker_address:string;price:number;size:number;notional_usd:number;created_at:string}>;
+  asks:L4BookSnapshot["bids"];
+  quality:{atomic_snapshot:true;complete_book:false;orders_per_side_limit:number;returned_bid_orders:number;returned_ask_orders:number;incremental_continuity_asserted:false};
+  provenance:Record<string,unknown>;
+}
+export interface RealizedLiquidations {
+  service:"omni.hyperliquid_realized_liquidations";schema:"hyperliquid_realized_liquidations.v1";product_version:"v1";symbol:string;scope:"current"|"aggregate";venue:"hyperliquid";generated_at:string;data_as_of:string;observed_through:string;freshness:Freshness;latest_liquidation_event_at:string|null;quiet_window:boolean;
+  windows:Array<{window_seconds:number;from_timestamp:number;to_timestamp:number;observed_fill_count:number;total_notional_usd:number;buy_notional_usd:number;sell_notional_usd:number;largest_notional_usd:number;oldest_event_at:string|null;newest_event_at:string|null;coverage:{sampled:true;complete_window:false;tail_truncated:boolean;source_returned_rows:number;lower_bound:true}}>;
+  quality:{sampled:true;complete_window:false;duplicate_rows_removed:number;ingestion_watermark_source:"global_public_fills_stream"};provenance:Record<string,unknown>;
+}
 
 export interface NewsAnalysisLineage {
   schema_version: string;
@@ -118,6 +203,7 @@ export interface X402Health {
   payment_enabled: boolean;
   bazaar_metadata?: boolean;
   discovery_catalog?: string;
+  readiness_scope?: "payment_transport";
 }
 
 export interface X402AnalysisLineage {
@@ -129,19 +215,26 @@ export interface X402AnalysisLineage {
 
 export interface X402NewsItem {
   id: string;
-  timestamp: number;
+  timestamp: number | null;
   headline: string;
   summary: string;
   direction: string;
-  sentiment: number;
+  sentiment: number | null;
   impact: string;
-  importance: number;
-  confidence: number;
+  importance: number | null;
+  confidence: number | null;
+  impact_basis?: "unknown" | "source_importance_1_10_and_financial_event_evidence";
+  lineage?: X402PublicNewsLineage;
   tickers: string[];
   topics: string[];
   theme: string;
   analysis_type: string;
   analysis: X402AnalysisLineage;
+}
+
+export interface X402PublicNewsLineage {
+  event_id:string;content_hash:string;source_revision:string|null;source_event_at:string|null;
+  generated_at:string|null;ingested_at:string|null;schema_version:string|null;
 }
 
 export interface X402ContextEvent {
@@ -156,12 +249,15 @@ export interface X402ContextEvent {
 export interface X402MarketContext {
   object: "market_context.v1";
   generated_at: string;
-  cadence_minutes: 15;
+  cadence_minutes: number;
+  source_data_as_of?:string|null;
+  source_coverage?:{oldest_event_at:string|null;newest_event_at:string|null;known_count:number|null;unknown_count:number|null};
+  lineage?:X402PublicNewsLineage;
   source_window_hours: number | null;
   summary: string;
   direction: string;
-  sentiment_rating: number;
-  confidence: number;
+  sentiment_rating: number | null;
+  confidence: number | null;
   notable_tickers: string[];
   topics: string[];
   timeline: X402ContextEvent[];
@@ -174,8 +270,13 @@ export interface NewsPulse {
   symbol?: string;
   market: string;
   generated_at: string;
-  data_as_of: string;
-  freshness: Freshness;
+  data_as_of: string | null;
+  freshness: Freshness & {
+    components?:{events:Freshness;context:Freshness|null;ingestion:Freshness};observed_through?:string|null;
+    latest_event_at?:string|null;latest_event_age_seconds?:number|null;quiet_window?:boolean;
+    complete_window?:"unknown";analysis_catch_up?:"unknown";analysis_progress?:{persisted_at:string|null;source_event_at:string|null};
+  };
+  availability?:{events:"available"|"unavailable";context:"available"|"unavailable"|"not_requested"};
   market_context: X402MarketContext | null;
   items: X402NewsItem[];
   usage: {
@@ -227,7 +328,12 @@ export interface TraderProfile {
   positions: TraderPosition[];
   spot_balances: TraderSpotBalance[];
   activity: ScalarMap;
-  quality: { degraded_sources?: string[]; portfolio_history_used?: JsonPrimitive };
+  quality: {
+    degraded_sources?: string[]; portfolio_history_used?: JsonPrimitive;
+    valuation_complete?:boolean;valuation_status?:"complete"|"partial"|"unavailable";missing_valuation_fields?:string[];
+    positions?:{source_returned_count:number;returned_count:number;omitted_by_view:boolean;truncated_by_limit:boolean;source_collection_complete:false};
+    spot_balances?:{source_returned_count:number;returned_count:number;omitted_by_view:boolean;truncated_by_limit:boolean;source_collection_complete:false};
+  };
   usage: { position_count: number; spot_balance_count: number };
 }
 
@@ -281,6 +387,7 @@ export interface LiquidationMap {
   clusters?: Record<string, unknown>;
   flow?: Array<Record<string, unknown>>;
   usage: Record<string, unknown>;
+  source_quality?:{liquidations:PublishedAnalysisInputQuality};
 }
 
 export interface TraderLeaderboard {
@@ -294,7 +401,10 @@ export interface TraderLeaderboard {
   data_as_of: string | number | null;
   freshness: Freshness;
   rows: Array<Record<string, unknown>>;
+  ranking?: { basis: string; order: "ascending" | "descending"; pnl_currency: "USD"; realized_pnl_included: false; historical_performance_included: false };
+  provenance?: { venue: "hyperliquid"; dataset: "public_position_snapshot"; population: string; observed_position_count: number | null; published_ranking_count: number; exhaustive_all_wallets: false };
   usage: Record<string, unknown>;
+  source_quality?:PublishedAnalysisInputQuality;
 }
 
 export interface MarketSnapshotCandle {
@@ -316,12 +426,15 @@ export interface MarketSnapshot {
   interval: string;
   scope: "current" | "aggregate";
   generated_at: string;
+  observed_through?: string;
+  latest_candle_period_end?: string | null;
   data_as_of: string | null;
   freshness: Freshness;
   candles: MarketSnapshotCandle[];
   funding: MarketCarry;
   liquidation_overlay?: LiquidationMap | null;
   usage: Record<string, unknown>;
+  source_quality?:{liquidation_overlay:LiquidationMap['source_quality']|null};
 }
 
 export interface EntityResolutionItem {
@@ -329,6 +442,8 @@ export interface EntityResolutionItem {
   normalized_alias: string;
   resolution_status: "resolved" | "unsupported";
   canonical_symbol: string | null;
+  eligible_products?:string[];
+  availability_evaluated?:false;
   venue?: "hyperliquid";
   base?: string;
   quote?: string;
@@ -361,7 +476,16 @@ export interface EntityResolution {
   usage: { mention_count: number; resolved_count: number; mention_limit: 20 };
 }
 
+export interface PublishedAnalysisInputQuality {
+  input_observation_status:"unknown";
+  source_observed_through:null;
+  complete_window:"unknown";
+  legacy_source_clock_coverage:"unknown";
+}
+
 export interface Freshness {
+  /** Publication freshness does not establish freshness of the underlying observations. */
+  basis?:string;
   status: "fresh" | "stale" | "historical" | "unknown";
   data_as_of?: string | null;
   age_seconds: number | null;
@@ -418,11 +542,12 @@ export interface MarketRisk {
   scope: "current" | "aggregate";
   generated_at: string;
   data_as_of: string | null;
-  freshness: Record<string, unknown>;
+  freshness: Record<string, unknown> & {basis?:string};
   liquidations: LiquidationMap;
   funding: MarketCarry;
   news: NewsPulse;
   usage: { event_window_minutes: 15 | 60; component_limit: number };
+  source_quality?:{liquidations:LiquidationMap['source_quality']};
 }
 
 export interface PublishedPremarketRoundup {
@@ -494,3 +619,53 @@ export interface AgentDecision {
   rationale: string[];
   maxNotionalUsd: number;
 }
+
+/** Curated, sampled public events; availability requires a qualified DEV/successor seller. */
+export type PublicMarketAlertType = "large_liquidation" | "large_trader_action";
+export interface PublicMarketAlertsQuery { limit?:number; lookback_hours?:number; before_timestamp?:number; types?:readonly PublicMarketAlertType[] }
+export type PublicMarketAlertEvent = {
+  id:string;address:string;symbol:string;event_at:string;freshness:Freshness;
+} & ({kind:"liquidation_fill";source_alert_type:"large_liquidation";source_timestamp_basis:"hyperliquid_native_fill_time";trade_id:string;execution_side:"buy"|"sell";liquidated_position_side:"long"|"short";price:number;base_size:number;notional_usd:number|null;quote_currency:string|null;notional_quote:number|null;notional_basis:"USDC_settled_protocol_price_times_size"|"quote_identity_not_proven_USDC"}
+ | {kind:"observed_position_change";source_alert_type:"large_trader_action";source_timestamp_basis:"observed_position_row_version";before_observed_at:string;before_base_size:number;after_base_size:number;change:"opening"|"closing"|"reversing"|"increasing"|"reducing";execution_cause:"unconfirmed"});
+export interface PublicMarketAlerts {
+  service:"omni.public_market_alerts";schema:"public_market_alerts.v1";product_version:"v1";symbol:string;canonical_symbol:string|null;venue:"hyperliquid";market_type:"perp";
+  generated_at:string;data_as_of:string|null;freshness:Freshness;events:PublicMarketAlertEvent[];
+  coverage:{sampled:true;complete_window:"unknown";quiet_window_proven:false;source_limit:500;market_filter_applied_after_source_limit:true;source_limit_reached:boolean;invalid_source_rows_excluded:boolean};
+  query:{limit:number;lookback_hours:number;before_timestamp:number|null;types:PublicMarketAlertType[]};
+  provenance:Record<string,unknown>;capabilities:Record<string,unknown>;
+}
+
+/** Historical House disclosures. Reported amounts are strings/ranges, not execution values. */
+export interface PublicCongressQuery { limit?:number; offset?:number; public_revision?:string }
+export interface PublicCongressRow {
+ id:string;row_index:number;asset:string;ticker:string|null;ticker_resolution:"reported_in_filing"|"unresolved";asset_type:string;
+ transaction_type:"buy"|"sell"|"exchange";reported_amount:string;amount_currency:"USD";amount_basis:"reported_disclosure_range_or_amount";
+ transaction_date:string;notification_date:string;owner_code:"SP"|"JT"|"DC"|null;sale_kind:"partial"|"total"|"full"|null;
+}
+export interface PublicCongressFiling {
+ service:"omni.public_congress_filing";schema:"public_congress_filing.v1";product_version:"v1";source:"house_clerk";chamber:"House";
+ doc_id:string;member:string;official_url:string;disclosure_date:string;parsed_at:string;public_revision:string;rows:PublicCongressRow[];
+ pagination:{limit:number;offset:number;source_row_count:number;returned_count:number;next_offset:number|null};
+ freshness:{status:"historical";data_as_of:string;source_poll_status:"unknown";timestamp_precision:"date"};
+ coverage:{parser_completed:true;document_rows_complete:"unknown";global_completeness:"unknown";amendment_status:"unknown";source_parsed_row_count:number};
+ capabilities:{chambers:readonly ["House"]|readonly string[];source:"house_clerk";lookup:"official_document_id";discovery:"not_available";coverage:"cached_parsed_documents_only";document_rows_complete:"unknown";global_completeness:"unknown";amendment_status:"unknown";amount_semantics:"reported_USD_range_or_amount_not_execution_value";senate:"unqualified"};
+}
+
+export type PublicWalletGraphSymbol="BTC"|"ETH"|"SOL";
+export interface PublicWalletGraphQuery {limit?:number;edge_limit?:number}
+export interface PublicWalletLinksQuery {limit?:number}
+export interface PublicWalletGraphNode {address:string;gross_source_notional:number;net_source_notional:number;notional_currency:null;notional_basis:"upstream_position_value_aggregate_quote_identity_unknown"}
+export interface PublicWalletGraphEdge {source:string;target:string;relation:"behavioral_similarity"|"direction_alignment"|"direction_opposition";heuristic_score:number;overlap_score:number;size_similarity_score:number;identity_confirmed:false;correlation:null;timing_synchronization:null;unavailable_metrics:readonly ["correlation","timing_synchronization"]}
+export interface PublicWalletGraphMetadata {
+ service:"omni.public_wallet_graph";schema:"public_wallet_graph.v1";product_version:"v1";symbol:PublicWalletGraphSymbol;window:"24h";bucket:"5m";
+ generated_at:string;artifact_generated_at:string;data_as_of:string;freshness:Freshness&{basis:"hyperliquid_clearinghouse_state_time_v1"};
+ market_scope:"observed_hyperliquid_perpetual_base_symbol_across_dexes";
+ methodology:{method:"nearest_neighbor_exposure_behavior_heuristic";run_id:string;graph_version:string;feature_version:string;model_version:string;algo_version:string;identity_proof:false;history_bucket_basis:"database_persistence_time"};
+ source_quality:{source_observed_min:string;source_observed_through:string;history_observed_min:string;history_observed_through:string;live_rows:number;qualified_live_rows:number;history_rows:number;qualified_history_rows:number;population_complete:"unknown";complete_window:"unknown";excluded_population:"configured_observed_population_filter"};
+ nodes:PublicWalletGraphNode[];
+ coverage:{source_nodes:number;source_edges:number;returned_nodes:number;returned_edges:number;truncated:boolean;byte_budget_truncated?:boolean;complete_graph:false;absence_means?:"not_present_in_observed_thresholded_graph"};
+}
+export interface PublicWalletGraph extends PublicWalletGraphMetadata {view:"graph";edges:PublicWalletGraphEdge[]}
+export interface PublicWalletPair extends PublicWalletGraphMetadata {view:"pair";wallet_a:string;wallet_b:string;pair:PublicWalletGraphEdge|null}
+export interface PublicWalletLinks extends PublicWalletGraphMetadata {view:"links";address:string;links:PublicWalletGraphEdge[]}
+export type PublicWalletGraphResult=PublicWalletGraph|PublicWalletPair|PublicWalletLinks;

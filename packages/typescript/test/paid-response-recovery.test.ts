@@ -80,7 +80,7 @@ test("unsigned health parsing and rejected quote/admission remain unchanged", as
     assert.equal((error as Recovery).requiresReconciliation, undefined);
     return true;
   });
-  assert.throws(() => health.marketCarry("DOGE" as never), RangeError);
+  assert.throws(() => health.marketCarry("DOGE/../../private" as never), RangeError);
   assert.equal(calls, 1);
   const substituted = new OmniX402Client({ paymentClient: new x402Client(), fetch: async () => Response.json({}, { status: 402,
     headers: { "payment-required": encodePaymentRequiredHeader({ x402Version: 2, resource: { url: "https://other.invalid/paid" }, accepts: [] }) },
@@ -153,7 +153,7 @@ test("public paid requests preserve official verification reasons from gateway-s
   for (const reason of [...verificationReasons, sentinel]) {
     let calls = 0, fixturePayloads = 0;
     // An unsigned fixture mechanism exercises the HTTP handshake without any signer or network.
-    const payer = new x402Client().register("eip155:*", { scheme: "exact", createPaymentPayload: async () => {
+    const payer = new x402Client().setSpendControls({allowedAssets:[{network:rejectionRequirements.network,asset:rejectionRequirements.asset,maxAmountPerPayment:"1000"}]}).register("eip155:*", { scheme: "exact", createPaymentPayload: async () => {
       fixturePayloads++;
       return { x402Version: 2, payload: { fixture: "unsigned deterministic payload" } };
     } });

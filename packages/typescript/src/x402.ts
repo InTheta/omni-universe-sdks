@@ -1,3 +1,7 @@
+import type {PublicWalletGraph,PublicWalletPair,PublicWalletLinks,PublicWalletGraphQuery,PublicWalletLinksQuery} from "./types.js";
+import {walletGraphSymbol,walletGraphAddress,validateWalletGraphQuery,assertWalletGraphIdentity} from "./wallet-graph-contract.js";
+import type { PublicCongressFiling, PublicCongressQuery } from "./types.js";
+import type { PublicMarketAlerts, PublicMarketAlertsQuery } from "./types.js";
 import { decodePaymentRequiredHeader } from "@x402/core/http";
 import { x402Client, x402HTTPClient } from "@x402/core/client";
 import { ExactEvmScheme } from "@x402/evm/exact/client";
@@ -11,6 +15,15 @@ import type {
   MarketCarry,
   MarketRisk,
   MarketSnapshot,
+  MarketMicrostructure,
+  FundingHistory,
+  PublicMarketSymbol,
+  PublicMarketCatalog,
+  PublicMarketsQuery,
+  L4BookSnapshot,
+  RealizedLiquidations,
+  LiquidationWindow,
+  PublicSpotMarketsQuery, PublicSpotMarketCatalog, SpotMarketQuote, SpotCandles, SpotCandleInterval,
   NewsPulse,
   PaidResult,
   PaymentReceipt,
@@ -28,7 +41,7 @@ export interface LiquidationLevelsScreenshotQuery {
   interval?: "1m" | "5m" | "15m" | "1h" | "2h" | "4h" | "8h" | "1d" | "3d" | "1w" | "1M";
   scope?: "current" | "aggregate"; layout?: "compact" | "standard" | "tall";
 }
-export interface LiquidationBucketScreenshotQuery { price: number; side?: "all" | "buy" | "sell"; scope?: "current" | "aggregate" }
+export interface LiquidationBucketScreenshotQuery { price: number; price_end?:number; bucket_size?:number; side?: "all" | "buy" | "sell"; scope?: "current" | "aggregate" }
 export interface TraderProfileScreenshotQuery { symbol?: X402Symbol; range?: "1d" | "7d" | "30d" | "all"; tab?: "positions" | "pnl" | "balance" | "mixed"; mode?: "chart" | "stats" | "full_stats" }
 
 export interface OmniX402ClientOptions {
@@ -278,7 +291,7 @@ export class OmniX402Client {
   }
 
   liquidationMap(
-    symbol: X402Symbol,
+    symbol: PublicMarketSymbol,
     query: {
       scope?: "current" | "aggregate";
       view?: "summary" | "buckets" | "clusters" | "flow";
@@ -288,7 +301,7 @@ export class OmniX402Client {
       side?: "all" | "long" | "short";
     } = {},
   ): Promise<PaidResult<LiquidationMap>> {
-    assertSymbol(symbol);
+    assertPublicMarketSymbol(symbol);
     assertOptionalOneOf("scope", query.scope, ["current", "aggregate"]);
     assertOptionalOneOf("view", query.view, ["summary", "buckets", "clusters", "flow"]);
     assertOptionalOneOf("order", query.order, ["strongest", "nearest", "price"]);
@@ -304,10 +317,10 @@ export class OmniX402Client {
   }
 
   traderLeaderboard(
-    symbol: X402Symbol,
+    symbol: PublicMarketSymbol,
     query: { scope?: "current" | "aggregate"; rank?: "best" | "worst" | "largest" | "largest_size" | "wallet_size" | "risk" | "closest"; limit?: number } = {},
   ): Promise<PaidResult<TraderLeaderboard>> {
-    assertSymbol(symbol);
+    assertPublicMarketSymbol(symbol);
     assertOptionalOneOf("scope", query.scope, ["current", "aggregate"]);
     assertOptionalOneOf("rank", query.rank, ["best", "worst", "largest", "largest_size", "wallet_size", "risk", "closest"]);
     assertOptionalInteger("limit", query.limit, 1, 20);
@@ -332,10 +345,10 @@ export class OmniX402Client {
   }
 
   marketSnapshot(
-    symbol: X402Symbol,
+    symbol: PublicMarketSymbol,
     query: { interval?: "1m" | "5m" | "15m" | "1h" | "2h" | "4h" | "8h" | "1d" | "3d" | "1w" | "1M"; limit?: number; scope?: "current" | "aggregate"; include_liquidations?: boolean } = {},
   ): Promise<PaidResult<MarketSnapshot>> {
-    assertSymbol(symbol);
+    assertPublicMarketSymbol(symbol);
     assertOptionalOneOf("interval", query.interval, ["1m", "5m", "15m", "1h", "2h", "4h", "8h", "1d", "3d", "1w", "1M"]);
     assertOptionalOneOf("scope", query.scope, ["current", "aggregate"]);
     assertOptionalInteger("limit", query.limit, 20, 200);
@@ -363,11 +376,75 @@ export class OmniX402Client {
     });
   }
 
-  marketCarry(symbol: X402Symbol): Promise<PaidResult<MarketCarry>> {
-    assertSymbol(symbol);
+  marketCarry(symbol: PublicMarketSymbol): Promise<PaidResult<MarketCarry>> {
+    assertPublicMarketSymbol(symbol);
     return this.request("GET", `/api/x402/v1/market-carry/${symbol}`, {
       contract: { service: "omni.hyperliquid_market_carry", schema: "hyperliquid_market_carry.v1" },
     });
+  }
+
+  marketMicrostructure(symbol:PublicMarketSymbol,query:{depth?:number;trade_limit?:number;trade_window_seconds?:number}={}):Promise<PaidResult<MarketMicrostructure>>{
+    assertPublicMarketSymbol(symbol);assertOptionalInteger("depth",query.depth,1,50);assertOptionalInteger("trade_limit",query.trade_limit,1,100);assertOptionalInteger("trade_window_seconds",query.trade_window_seconds,1,3600);
+    return this.request("GET",`/api/x402/v1/market-microstructure/${encodeURIComponent(symbol)}`,{query,contract:{service:"omni.hyperliquid_market_microstructure",schema:"hyperliquid_market_microstructure.v1",requiredCollection:"trades"}});
+  }
+
+  async marketInstruments(query:PublicMarketsQuery={}):Promise<PaidResult<PublicMarketCatalog>>{
+    validatePublicMarketsQuery(query);
+    const result=await this.request<PublicMarketCatalog>("GET","/api/x402/v1/markets",{query:{...query},contract:{service:"omni.public_market_catalog",requiredCollection:"rows"}});
+    if(result.data.schema!=="public_market_catalog.v1")throw new OmniContractError("Invalid public market catalog schema","/api/x402/v1/markets",undefined);
+    return result;
+  }
+
+  async spotMarketInstruments(query:PublicSpotMarketsQuery={}):Promise<PaidResult<PublicSpotMarketCatalog>>{
+    validateSpotMarketsQuery(query);
+    const result=await this.request<PublicSpotMarketCatalog>("GET","/api/x402/v1/spot-markets",{query:{...query},contract:{service:"omni.public_spot_market_catalog",requiredCollection:"rows"}});
+    if(result.data.schema!=="public_spot_market_catalog.v1")throw new OmniContractError("Invalid public spot catalog schema","/api/x402/v1/spot-markets",undefined);
+    return result;
+  }
+  async spotMarketQuote(pairIndex:number,query:{depth?:number}={}):Promise<PaidResult<SpotMarketQuote>>{
+    assertSpotPairIndex(pairIndex);assertOptionalInteger("depth",query.depth,1,20);
+    const result=await this.request<SpotMarketQuote>("GET",`/api/x402/v1/spot-quote/${pairIndex}`,{query,contract:{service:"omni.hyperliquid_spot_quote",schema:"hyperliquid_spot_quote.v1"}});
+    assertSpotResultIdentity(result.data,pairIndex);return result;
+  }
+  async spotCandles(pairIndex:number,query:{interval?:SpotCandleInterval;limit?:number}={}):Promise<PaidResult<SpotCandles>>{
+    assertSpotPairIndex(pairIndex);validateSpotCandlesQuery(query);
+    const result=await this.request<SpotCandles>("GET",`/api/x402/v1/spot-candles/${pairIndex}`,{query,contract:{service:"omni.hyperliquid_spot_candles",schema:"hyperliquid_spot_candles.v1",requiredCollection:"candles"}});
+    assertSpotResultIdentity(result.data,pairIndex);return result;
+  }
+
+  async walletGraph(rawSymbol:string,query:PublicWalletGraphQuery={}):Promise<PaidResult<PublicWalletGraph>> {
+    const symbol=walletGraphSymbol(rawSymbol);validateWalletGraphQuery(query,"graph");const result=await this.request<PublicWalletGraph>("GET",`/api/x402/v1/wallet-graph/${symbol}`,{query:{...query},contract:{service:"omni.public_wallet_graph",schema:"public_wallet_graph.v1",requiredCollection:"nodes"}});assertWalletGraphIdentity(result.data,symbol,"graph",query);return result;
+  }
+  async walletPair(rawSymbol:string,rawA:string,rawB:string):Promise<PaidResult<PublicWalletPair>> {
+    const symbol=walletGraphSymbol(rawSymbol),a=walletGraphAddress(rawA),b=walletGraphAddress(rawB);if(a===b)throw new RangeError("wallet pair requires distinct public addresses");const result=await this.request<PublicWalletPair>("GET",`/api/x402/v1/wallet-pair/${symbol}/${a}/${b}`,{contract:{service:"omni.public_wallet_graph",schema:"public_wallet_graph.v1",requiredCollection:"nodes"}});assertWalletGraphIdentity(result.data,symbol,"pair",{},a,b);return result;
+  }
+  async walletLinks(rawSymbol:string,rawAddress:string,query:PublicWalletLinksQuery={}):Promise<PaidResult<PublicWalletLinks>> {
+    const symbol=walletGraphSymbol(rawSymbol),address=walletGraphAddress(rawAddress);validateWalletGraphQuery(query,"links");const result=await this.request<PublicWalletLinks>("GET",`/api/x402/v1/wallet-links/${symbol}/${address}`,{query:{...query},contract:{service:"omni.public_wallet_graph",schema:"public_wallet_graph.v1",requiredCollection:"nodes"}});assertWalletGraphIdentity(result.data,symbol,"links",query,address);return result;
+  }
+
+  async congressFiling(docId:string,query:PublicCongressQuery={}):Promise<PaidResult<PublicCongressFiling>> {
+    validateCongressRequest(docId,query);
+    const result=await this.request<PublicCongressFiling>("GET",`/api/x402/v1/congress-filings/${encodeURIComponent(docId)}`,{query:{...query},contract:{service:"omni.public_congress_filing",schema:"public_congress_filing.v1",requiredCollection:"rows"}});
+    assertCongressFilingIdentity(result.data,docId,query);return result;
+  }
+
+  async marketAlerts(symbol:PublicMarketSymbol,query:PublicMarketAlertsQuery={}):Promise<PaidResult<PublicMarketAlerts>>{
+    assertPublicMarketSymbol(symbol);validateMarketAlertsQuery(query);
+    const result=await this.request<PublicMarketAlerts>("GET",`/api/x402/v1/market-alerts/${encodeURIComponent(symbol)}`,{query:{...query,types:query.types?.join(",")},contract:{service:"omni.public_market_alerts",schema:"public_market_alerts.v1",requiredCollection:"events"}});
+    assertMarketAlertsIdentity(result.data,symbol);return result;
+  }
+
+  fundingHistory(symbol:PublicMarketSymbol,query:{lookback_hours?:number;limit?:number}={}):Promise<PaidResult<FundingHistory>>{
+    assertPublicMarketSymbol(symbol);assertOptionalInteger("lookback_hours",query.lookback_hours,1,168);assertOptionalInteger("limit",query.limit,1,168);
+    return this.request("GET",`/api/x402/v1/funding-history/${encodeURIComponent(symbol)}`,{query,contract:{service:"omni.hyperliquid_funding_history",schema:"hyperliquid_funding_history.v1",requiredCollection:"rows"}});
+  }
+  l4BookSnapshot(symbol:PublicMarketSymbol,query:{orders_per_side?:number}={}):Promise<PaidResult<L4BookSnapshot>>{
+    assertPublicMarketSymbol(symbol);assertOptionalInteger("orders_per_side",query.orders_per_side,1,50);
+    return this.request("GET",`/api/x402/v1/orderbook-l4/${encodeURIComponent(symbol)}`,{query,contract:{service:"omni.hyperliquid_l4_snapshot",schema:"hyperliquid_l4_snapshot.v1",requiredCollection:"bids"}});
+  }
+  realizedLiquidations(symbol:PublicMarketSymbol,query:{scope?:"current"|"aggregate";windows?:readonly LiquidationWindow[]}={}):Promise<PaidResult<RealizedLiquidations>>{
+    assertPublicMarketSymbol(symbol);assertOptionalOneOf("scope",query.scope,["current","aggregate"]);validateLiquidationWindows(query.windows);
+    return this.request("GET",`/api/x402/v1/liquidation-bursts/${encodeURIComponent(symbol)}`,{query:{scope:query.scope,windows:query.windows?.join(",")},contract:{service:"omni.hyperliquid_realized_liquidations",schema:"hyperliquid_realized_liquidations.v1",requiredCollection:"windows"}});
   }
 
   /** Purchase a bounded PNG. The returned receipt is seller metadata; reconcile it on-chain separately. */
@@ -440,6 +517,9 @@ export class OmniX402Client {
   liquidationBucketScreenshot(symbol: X402Symbol, query: LiquidationBucketScreenshotQuery): Promise<PaidResult<ScreenshotPng>> {
     assertSymbol(symbol);
     if (!query || !Number.isFinite(query.price) || query.price <= 0 || query.price > 1_000_000_000) throw new RangeError("price must be a positive finite number at most 1000000000");
+    for(const key of ["price_end","bucket_size"] as const)if(query[key]!==undefined&&(!Number.isFinite(query[key])||query[key]!<=0||query[key]!>1e9))throw new RangeError(`${key} must be positive and bounded`);
+    if(query.price_end!==undefined&&query.price_end<=query.price)throw new RangeError("price_end must exceed price");
+    if(query.price_end!==undefined&&query.bucket_size!==undefined&&Math.abs(query.price_end-query.price-query.bucket_size)>Math.max(1e-8,query.bucket_size*1e-10))throw new RangeError("bucket range must agree");
     assertOptionalOneOf("side", query.side, ["all", "buy", "sell"]);
     assertOptionalOneOf("scope", query.scope, ["current", "aggregate"]);
     return this.requestScreenshot(`/api/x402/v1/screenshots/liquidation-bucket/${symbol}`, { ...query });
@@ -476,6 +556,27 @@ const x402Symbols: readonly X402Symbol[] = ["BTC", "ETH", "SOL", "HYPE"];
 
 function assertSymbol(symbol: string): asserts symbol is X402Symbol {
   assertOneOf("symbol", symbol, x402Symbols);
+}
+
+export function assertPublicMarketSymbol(symbol:unknown):asserts symbol is PublicMarketSymbol{
+  if(typeof symbol!=="string" || !/^(?:[a-zA-Z0-9_-]{1,24}:)?[a-zA-Z0-9][a-zA-Z0-9._-]{0,39}$/.test(symbol))throw new RangeError("symbol must be a public perpetual subscription key, optionally dex:COIN");
+}
+export function validatePublicMarketsQuery(query:PublicMarketsQuery):void{
+  for(const key of Object.keys(query))if(!["limit","offset","search","dex","revision"].includes(key))throw new RangeError("unknown public market catalog query");
+  assertOptionalInteger("limit",query.limit,1,50);assertOptionalInteger("offset",query.offset,0,100000);assertOptionalInteger("revision",query.revision,0,Number.MAX_SAFE_INTEGER);
+  if(query.search!==undefined&&(typeof query.search!=="string"||query.search.length>40||/[\u0000-\u001f\u007f]/.test(query.search)))throw new RangeError("invalid market search");
+  if(query.dex!==undefined&&(typeof query.dex!=="string"||!/^[a-zA-Z0-9_-]{1,24}$/.test(query.dex)))throw new RangeError("invalid dex");
+}
+export function assertSpotPairIndex(value:unknown):asserts value is number {if(typeof value!=="number"||!Number.isSafeInteger(value)||value<0||value>9999999)throw new RangeError("pair_index must be an exact public spot pair index");}
+export function assertSpotResultIdentity(value:{market?:unknown},pairIndex:number):void {
+  const m=value.market as Record<string,unknown>|undefined;
+  if(!m||m.market_id!==`hyperliquid:spot:${pairIndex}`||m.market_type!=="spot"||m.pair_index!==pairIndex||m.source_coin!==(pairIndex===0?"PURR/USDC":`@${pairIndex}`))throw unconfirmedPaidResponse(new OmniContractError("Paid spot response has a different market identity",`spot:${pairIndex}`,undefined));
+}
+export function validateSpotCandlesQuery(query:{interval?:SpotCandleInterval;limit?:number}){assertOptionalOneOf("interval",query.interval,["1m","5m","15m","1h","4h","1d"]);assertOptionalInteger("limit",query.limit,1,200);}
+export function validateSpotMarketsQuery(query:PublicSpotMarketsQuery){for(const k of Object.keys(query))if(!["limit","offset","revision"].includes(k))throw new RangeError("unknown spot market query");assertOptionalInteger("limit",query.limit,1,25);assertOptionalInteger("offset",query.offset,0,10000);if(query.revision!==undefined&&(typeof query.revision!=="string"||!/^[a-f0-9]{64}$/.test(query.revision)))throw new RangeError("spot metadata revision must be sha256");}
+export function validateLiquidationWindows(windows:unknown):void{
+  if(windows===undefined)return;
+  if(!Array.isArray(windows)||windows.length<1||windows.length>4||new Set(windows).size!==windows.length||windows.some(v=>!["1m","5m","15m","1h"].includes(String(v))))throw new RangeError("windows must contain one to four unique supported windows");
 }
 
 function assertIsoDate(name: string, value: unknown): asserts value is string {
@@ -602,4 +703,39 @@ async function waitForScreenshot<T>(promise: Promise<T>, signal: AbortSignal): P
   });
   try { return await Promise.race([promise, aborted]); }
   finally { signal.removeEventListener("abort", rejectOnAbort); }
+}
+
+export function validateMarketAlertsQuery(query:PublicMarketAlertsQuery):void {
+  for(const key of Object.keys(query))if(!["limit","lookback_hours","before_timestamp","types"].includes(key))throw new RangeError("unknown market alerts query");
+  assertOptionalInteger("limit",query.limit,1,20);assertOptionalInteger("lookback_hours",query.lookback_hours,1,24);
+  if(query.before_timestamp!==undefined&&(!Number.isSafeInteger(query.before_timestamp)||query.before_timestamp<1_000_000_000_000||query.before_timestamp>Date.now()))throw new RangeError("before_timestamp must be a past Unix millisecond timestamp");
+  if(query.types!==undefined&&(!Array.isArray(query.types)||query.types.length<1||query.types.length>2||new Set(query.types).size!==query.types.length||query.types.some(v=>!["large_liquidation","large_trader_action"].includes(v))))throw new RangeError("types must contain unique supported public market alert types");
+}
+export function assertMarketAlertsIdentity(data:PublicMarketAlerts,requested:string):void {
+  const parts=requested.split(":"),expected=parts.length===1?requested.toUpperCase():parts[0]!.toLowerCase()==="main"?parts[1]!.toUpperCase():`${parts[0]!.toLowerCase()}:${parts[1]!.toUpperCase()}`;
+  if(data.symbol!==expected||data.venue!=="hyperliquid"||data.market_type!=="perp"||data.events.some(e=>!e||typeof e!=="object"||e.symbol!==expected||typeof e.address!=="string"||!/^0x[0-9a-fA-F]{40}$/.test(e.address)||/^0x0{40}$/.test(e.address)||typeof e.id!=="string"||!/^market_event_[a-f0-9]{64}$/.test(e.id)||!["liquidation_fill","observed_position_change"].includes(e.kind)||!Number.isFinite(Date.parse(e.event_at))||Date.parse(e.event_at)>Date.now()+5000))throw unconfirmedPaidResponse(new OmniContractError("Paid market alerts response has an invalid market or wallet identity","market-alerts",undefined));
+}
+
+export function validateCongressRequest(docId:string,query:PublicCongressQuery={}):void {
+ if(typeof docId!=="string"||!/^\d{1,12}$/.test(docId))throw new RangeError("docId must be a numeric official House document ID");
+ if(!query||typeof query!=="object"||Array.isArray(query))throw new TypeError("filing query must be an object");
+ for(const key of Object.keys(query))if(!["limit","offset","public_revision"].includes(key))throw new RangeError("unknown public filing query");
+ assertOptionalInteger("limit",query.limit,1,20);assertOptionalInteger("offset",query.offset,0,499);
+ if(query.public_revision!==undefined&&(typeof query.public_revision!=="string"||!/^[a-f0-9]{64}$/.test(query.public_revision)))throw new RangeError("invalid public filing revision");
+}
+export function assertCongressFilingIdentity(data:PublicCongressFiling,docId:string,query:PublicCongressQuery={}):void {
+ const reject=():never=>{throw unconfirmedPaidResponse(new OmniContractError("Paid House filing response has an invalid document or revision identity","congress-filings",undefined));};
+ const date=(v:unknown):v is string=>typeof v==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(v)&&Number.isFinite(Date.parse(`${v}T00:00:00Z`))&&new Date(`${v}T00:00:00Z`).toISOString().slice(0,10)===v;
+ const integer=(v:unknown,min:number,max:number):v is number=>typeof v==="number"&&Number.isSafeInteger(v)&&v>=min&&v<=max;
+ if(!data||typeof data!=="object"||data.service!=="omni.public_congress_filing"||data.schema!=="public_congress_filing.v1"||data.doc_id!==docId||data.source!=="house_clerk"||data.chamber!=="House"||typeof data.member!=="string"||!data.member.trim()||!date(data.disclosure_date)||typeof data.public_revision!=="string"||!/^[a-f0-9]{64}$/.test(data.public_revision)||(query.public_revision!==undefined&&data.public_revision!==query.public_revision)||!Array.isArray(data.rows))return reject();
+ if(typeof data.parsed_at!=="string"||!Number.isFinite(Date.parse(data.parsed_at))||Date.parse(data.parsed_at)<Date.parse(`${data.disclosure_date}T00:00:00Z`)||Date.parse(data.parsed_at)>Date.now()+5000)return reject();
+ if(data.official_url!==`https://disclosures-clerk.house.gov/public_disc/ptr-pdfs/${data.disclosure_date.slice(0,4)}/${docId}.pdf`||!data.freshness||data.freshness.status!=="historical"||data.freshness.data_as_of!==data.disclosure_date||data.freshness.timestamp_precision!=="date"||data.freshness.source_poll_status!=="unknown")return reject();
+ const page=data.pagination,coverage=data.coverage;
+ if(!page||page.limit!==(query.limit??20)||page.offset!==(query.offset??0)||!integer(page.source_row_count,1,500)||page.returned_count!==data.rows.length||data.rows.length>page.limit||!coverage||coverage.parser_completed!==true||coverage.document_rows_complete!=="unknown"||coverage.global_completeness!=="unknown"||coverage.amendment_status!=="unknown"||coverage.source_parsed_row_count!==page.source_row_count)return reject();
+ const count=Math.max(0,Math.min(page.limit,page.source_row_count-page.offset));if(count!==data.rows.length||page.next_offset!==(page.offset+count<page.source_row_count?page.offset+count:null))return reject();
+ const indices=new Set<number>(),ids=new Set<string>();let previousIndex=0;for(const row of data.rows){
+  if(!row||typeof row!=="object"||typeof row.id!=="string"||!/^house_filing_row_[a-f0-9]{64}$/.test(row.id)||!integer(row.row_index,1,10000)||indices.has(row.row_index)||row.row_index<=previousIndex||ids.has(row.id)||typeof row.asset!=="string"||!row.asset.trim()||row.asset.length>1000||/[\u0000-\u001f\u007f]/.test(row.asset)||typeof row.asset_type!=="string"||!/^[A-Z]{2}$/.test(row.asset_type)||!date(row.transaction_date)||!date(row.notification_date)||row.transaction_date>row.notification_date||row.notification_date>data.disclosure_date||!["buy","sell","exchange"].includes(row.transaction_type)||typeof row.reported_amount!=="string"||!/^\$\d[\d,]*(?:\.\d{2})?(?: - \$\d[\d,]*(?:\.\d{2})?)?$/.test(row.reported_amount)||row.amount_currency!=="USD"||row.amount_basis!=="reported_disclosure_range_or_amount")return reject();
+  if(![null,"SP","JT","DC"].includes(row.owner_code)||![null,"partial","total","full"].includes(row.sale_kind))return reject();
+  if(row.ticker===null?row.ticker_resolution!=="unresolved":typeof row.ticker!=="string"||!/^[A-Z][A-Z0-9.\-]{0,9}$/.test(row.ticker)||row.ticker_resolution!=="reported_in_filing")return reject();indices.add(row.row_index);ids.add(row.id);previousIndex=row.row_index;
+ }
 }
